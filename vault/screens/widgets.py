@@ -1,5 +1,6 @@
 import inspect
 
+from rich.text import Text
 from textual.binding import Binding
 from textual.screen import Screen
 from textual.widgets import Button, Checkbox, Input
@@ -7,6 +8,22 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..app import VaultApp
+
+
+RAW_LOGO = """\
+ _      _    ___
+| |    / \\  | _ \\
+| |__ / _ \\ |  _/
+|____/_/ \\_\\|_|"""
+
+
+def lap_logo() -> Text:
+    logo = Text(RAW_LOGO)
+    offset = 0
+    for line in RAW_LOGO.splitlines():
+        logo.stylize('#E53935', offset + 5, offset + 12)
+        offset += len(line) + 1
+    return logo
 
 
 class FormInput(Input, inherit_bindings=False):

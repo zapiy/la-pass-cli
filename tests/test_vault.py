@@ -180,6 +180,40 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                             self.assertLessEqual(button.region.right, width)
                             self.assertLessEqual(button.region.bottom, height)
 
+    async def test_email_mask_preserves_ends_and_masks_second_of_two(self):
+        with tempfile.TemporaryDirectory() as directory:
+            app = vault.VaultApp(Path(directory) / 'vault.db')
+            async with app.run_test(size=(80, 24)) as pilot:
+                app.session = vault.VaultSession.open(app.db_path, 'test master phrase')
+                for name in ('a', 'ab', 'abc', 'alice'):
+                    app.session.add(f'{name}@example.com')
+                await app.switch_screen(vault.AccountsScreen())
+                await pilot.pause()
+                self.assertEqual(
+                    [str(email.render()) for email in app.screen.query('.email')],
+                    ['a@example.com', 'a*@example.com', 'a*c@example.com', 'a***e@example.com'])
+
+    async def test_added_account_is_visible_in_list(self):
+        import time
+        from textual.widgets import Input, Static
+        with tempfile.TemporaryDirectory() as directory:
+            app = vault.VaultApp(Path(directory) / 'vault.db')
+            async with app.run_test(size=(80, 24)) as pilot:
+                app.session = vault.VaultSession.open(app.db_path, 'test master phrase')
+                app.unlocked_at = time.time()
+                await app.switch_screen(vault.AccountsScreen())
+                await pilot.click('#add')
+                app.screen.query_one('#email', Input).value = 'alice@example.com'
+                await pilot.click('#save')
+                await pilot.pause()
+                self.assertIsInstance(app.screen, vault.AccountsScreen)
+                self.assertEqual(app.session.emails(), ['alice@example.com'])
+                emails = list(app.screen.query('.email'))
+                self.assertEqual([str(email.render()) for email in emails], ['a***e@example.com'])
+                self.assertEqual(app.screen.query_one('#copy-0').name, 'alice@example.com')
+                self.assertGreater(emails[0].region.height, 0)
+                self.assertTrue(app.screen.query_one('#accounts').region.contains_region(emails[0].region))
+
     async def test_keyboard_create_add_lock(self):
         from textual.widgets import Input, Checkbox
         with tempfile.TemporaryDirectory() as directory:

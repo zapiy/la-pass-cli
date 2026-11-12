@@ -10,23 +10,7 @@ from textual.widgets import Button, Checkbox, Input, Static
 from ..crypto import derive_keys, wipe
 from ..storage import VaultError, VaultSession
 from .accounts import AccountsScreen
-from .widgets import ArrowScreen, FormInput
-
-
-RAW_LOGO = """\
- _      _    ___
-| |    / \\  | _ \\
-| |__ / _ \\ |  _/
-|____/_/ \\_\\|_|"""
-
-
-def lap_logo() -> Text:
-    logo = Text(RAW_LOGO)
-    offset = 0
-    for line in RAW_LOGO.splitlines():
-        logo.stylize('#E53935', offset + 5, offset + 12)
-        offset += len(line) + 1
-    return logo
+from .widgets import ArrowScreen, FormInput, lap_logo
 
 
 class SecretInput(FormInput):

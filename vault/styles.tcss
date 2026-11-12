@@ -15,11 +15,17 @@ Button { min-width: 11; width: 11; margin: 0 1 0 0; }
 #visible { margin-top: 2; margin-bottom: 1; max-width: 100%; }
 #status { height: auto; min-height: 2; color: #f0c878; margin-top: 1; }
 #hint { dock: bottom; height: auto; color: #9aaebd; }
+#accounts-header { height: 3; }
+#accounts-header .title { width: 1fr; content-align-vertical: middle; }
+#add { background: #00695C; }
+#add:focus { border: heavy #00695C; }
 #accounts { height: 1fr; margin-top: 1; }
 .account { height: 3; }
 .email { width: 1fr; padding-top: 1; }
 .account Button { width: 12; }
 #add-actions { height: 3; margin-top: 1; }
+#save { background: #00695C; }
+#save:focus { border: heavy #00695C; }
 Screen.short #visible { margin-top: 1; margin-bottom: 0; }
 Screen.short #login-title { margin-bottom: 0; }
 Screen.short #status { margin-top: 0; }
@@ -34,7 +40,7 @@ LoginScreen Input, LoginScreen Checkbox { margin-left: 0; margin-right: 0; paddi
 #login-actions { height: 3; }
 #clear-data { width: 8; min-width: 8; height: 3; padding: 0; border: none; content-align: center middle; text-align: center; color: #E53935; background: transparent; }
 #clear-data:hover, #clear-data:focus { background: #352027; }
-#clear-dialog { height: 1fr; align-vertical: middle; }
+#clear-dialog, #add-form { height: 1fr; align-vertical: middle; }
 #clear-actions { height: 3; margin-top: 1; }
 #clear-actions Button { width: 12; min-width: 12; content-align: center middle; text-align: center; }
 #confirm-clear { background: #E53935; color: #ffffff; }

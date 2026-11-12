@@ -4,17 +4,23 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Button, Input, Static
 
-from .widgets import ArrowScreen, FormInput
+from .widgets import ArrowScreen, FormInput, lap_logo
 
 
 class AccountsScreen(ArrowScreen):
     def compose(self) -> ComposeResult:
-        yield Static('ACCOUNTS', classes='title')
-        yield Button('+ Account', id='add', variant='primary')
+        with Horizontal(id='accounts-header'):
+            yield Static('ACCOUNTS', classes='title')
+            yield Button('+ Add', id='add', variant='primary')
         with VerticalScroll(id='accounts'):
             for index, email in enumerate(self.app.session.emails()):
+                name, domain = email.rsplit('@', 1)
+                if len(name) > 2:
+                    masked_name = name[0] + '*' * (len(name) - 2) + name[-1]
+                else:
+                    masked_name = name[0] + '*' * (len(name) - 1)
                 with Horizontal(classes='account'):
-                    yield Static(email, markup=False, classes='email')
+                    yield Static(f'{masked_name}@{domain}', markup=False, classes='email')
                     yield Button('Copy', id=f'copy-{index}', name=email)
         yield Static('', id='status', markup=False)
         yield Static('↑↓ Select  Enter OK  Esc Lock', id='hint')
@@ -40,12 +46,16 @@ class AccountsScreen(ArrowScreen):
 
 class AddScreen(ArrowScreen):
     def compose(self) -> ComposeResult:
-        yield Static('ADD ACCOUNT', classes='title')
-        yield FormInput(placeholder='alice@example.com', id='email')
-        with Horizontal(id='add-actions'):
-            yield Button('Add', id='save', variant='primary')
-            yield Button('Cancel', id='cancel')
-        yield Static('', id='status', markup=False)
+        with Horizontal(id='logo-header'):
+            yield Static(lap_logo(), id='lock-icon', markup=False)
+        with VerticalScroll(id='add-form'):
+            yield Static('ADD ACCOUNT', classes='title')
+            yield FormInput(placeholder='alice@example.com', id='email')
+            with Horizontal(id='add-actions'):
+                yield Button('Add', id='save', variant='primary')
+                yield Button('Cancel', id='cancel')
+            yield Static('', id='status', markup=False)
+        yield Static('↑↓ Select  ←→ Cursor  Enter OK  Esc Cancel', id='hint')
 
     def on_mount(self):
         self.query_one(Input).focus()
@@ -62,8 +72,8 @@ class AddScreen(ArrowScreen):
             self.query_one('#status', Static).update('Cannot save email. Check database access and disk space')
             return
         self.app.last_added = email
-        await self.app.pop_screen()
-        await self.app.switch_screen(AccountsScreen())
+        self.app.pop_screen()
+        self.app.switch_screen(AccountsScreen())
 
     async def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == 'cancel':
