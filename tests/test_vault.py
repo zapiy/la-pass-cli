@@ -51,6 +51,41 @@ class CryptoTests(unittest.TestCase):
 
 
 class UITests(unittest.IsolatedAsyncioTestCase):
+    async def test_menu_resizes_without_hiding_controls(self):
+        from textual.widgets import Button, Input
+        with tempfile.TemporaryDirectory() as directory:
+            app = vault.VaultApp(Path(directory) / 'vault.db')
+            async with app.run_test(size=(100, 32)) as pilot:
+                for width, height in ((100, 32), (40, 18), (28, 14), (80, 24)):
+                    await pilot.resize_terminal(width, height)
+                    await pilot.pause()
+                    field = app.screen.query_one('#master', Input)
+                    button = app.screen.query_one('#unlock', Button)
+                    button.focus()
+                    await pilot.pause()
+                    self.assertGreaterEqual(button.region.x, 0)
+                    self.assertLessEqual(button.region.right, width)
+                    self.assertLessEqual(button.region.bottom, height)
+                    self.assertLessEqual(field.region.right, width)
+                    self.assertLessEqual(button.region.width, 11)
+                    self.assertEqual(str(app.screen.query_one('#lock-icon').render()), 'ℓ')
+                app.session = vault.VaultSession.open(app.db_path, 'test master phrase')
+                app.session.add('long.account.name@example.com')
+                await app.switch_screen(vault.AccountsScreen())
+                for screen in (app.screen, vault.AddScreen()):
+                    if screen is not app.screen:
+                        await app.push_screen(screen)
+                    for width, height in ((28, 14), (40, 18), (100, 32)):
+                        await pilot.resize_terminal(width, height)
+                        await pilot.pause()
+                        for button in screen.query(Button):
+                            button.focus()
+                            await pilot.pause()
+                            self.assertLessEqual(button.region.width, 12)
+                            self.assertGreaterEqual(button.region.x, 0)
+                            self.assertLessEqual(button.region.right, width)
+                            self.assertLessEqual(button.region.bottom, height)
+
     async def test_keyboard_create_add_lock(self):
         from textual.widgets import Input, Checkbox
         with tempfile.TemporaryDirectory() as directory:
@@ -127,7 +162,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                 field = app.screen.query_one('#master', Input)
                 checkbox_region = app.screen.query_one('#visible', Checkbox).region
                 self.assertGreater(checkbox_region.y, field.region.bottom)
-                self.assertGreater(app.screen.query_one('#lock-icon').region.x, 60)
+                self.assertEqual(app.screen.query_one('#lock-icon').styles.text_align, 'right')
                 await pilot.press('a', 'b', 'c', 'left', 'backspace')
                 self.assertEqual(field.value, 'ac')
                 self.assertEqual(field._value.plain, '**')

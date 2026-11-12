@@ -87,7 +87,15 @@ Tests use temporary encrypted databases and synthetic credentials. Keyboard flow
 ## Project layout
 
 ```text
-vault.py          Application, generation algorithm, and encrypted storage
+vault.py          Launcher (python vault.py)
+vault/crypto.py   Password derivation, generation, and email validation
+vault/storage.py  Encrypted SQLCipher storage and session
+vault/screens/login.py    Login screen and secret input
+vault/screens/accounts.py Account list and add account screen
+vault/screens/common.py   Shared input and keyboard navigation
+vault/app.py      Application lifecycle, locking, and clipboard
+vault/styles.tcss Responsive terminal layout and styles
+vault/__main__.py Module launcher (python -m vault)
 requirements.txt Pinned application dependencies
 README.md         Setup, controls, algorithm, and security limits
 tests/            Vault tests

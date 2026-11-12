@@ -1,0 +1,21 @@
+Screen { background: #101820; color: #e2e8f0; padding: 2 4; }
+Screen.narrow { padding: 1; }
+Screen.short { padding-top: 0; padding-bottom: 0; }
+Input { width: 48; max-width: 100%; }
+Input:focus, Button:focus, Checkbox:focus { border: heavy #57d8bc; }
+Button { min-width: 11; width: 11; margin: 0 1 0 0; }
+.title { height: 3; text-style: bold; color: #57d8bc; }
+#lock-icon { dock: top; width: 100%; height: 1; text-align: right; color: #57d8bc; }
+#login-form { height: 1fr; align-vertical: middle; }
+#login-title { height: 1; margin-bottom: 1; }
+#visible { margin-top: 2; margin-bottom: 1; max-width: 100%; }
+#status { height: auto; min-height: 2; color: #f0c878; margin-top: 1; }
+#hint { dock: bottom; height: auto; color: #9aaebd; }
+#accounts { height: 1fr; margin-top: 1; }
+.account { height: 3; }
+.email { width: 1fr; padding-top: 1; }
+.account Button { width: 12; }
+#add-actions { height: 3; margin-top: 1; }
+Screen.short #visible { margin-top: 1; margin-bottom: 0; }
+Screen.short #login-title { margin-bottom: 0; }
+Screen.short #status { margin-top: 0; }
