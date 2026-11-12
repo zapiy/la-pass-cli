@@ -8,7 +8,8 @@ Input { width: 48; max-width: 100%; }
 Input:focus, Button:focus, Checkbox:focus { border: heavy #B2DFDB; }
 Button { min-width: 11; width: 11; margin: 0 1 0 0; }
 .title { height: 3; text-style: bold; color: #B2DFDB; }
-#lock-icon { width: 100%; height: 4; text-align: right; color: #B2DFDB; }
+#logo-header { dock: top; height: 4; align-horizontal: right; }
+#lock-icon { width: 17; height: 4; text-align: left; color: #B2DFDB; }
 #login-form { height: 1fr; align-vertical: middle; }
 #login-title { height: 1; margin-bottom: 1; }
 #visible { margin-top: 2; margin-bottom: 1; max-width: 100%; }

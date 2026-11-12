@@ -256,7 +256,11 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                 field = app.screen.query_one('#master', Input)
                 checkbox_region = app.screen.query_one('#visible', Checkbox).region
                 self.assertGreater(checkbox_region.y, field.region.bottom)
-                self.assertEqual(app.screen.query_one('#lock-icon').styles.text_align, 'right')
+                logo = app.screen.query_one('#lock-icon')
+                header = app.screen.query_one('#logo-header')
+                self.assertEqual(logo.styles.text_align, 'left')
+                self.assertEqual(logo.region.right, header.content_region.right)
+                self.assertEqual(logo.region.y, header.region.y)
                 await pilot.press('a', 'b', 'c', 'left', 'backspace')
                 self.assertEqual(field.value, 'ac')
                 self.assertEqual(field._value.plain, '**')

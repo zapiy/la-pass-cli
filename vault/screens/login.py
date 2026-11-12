@@ -20,6 +20,15 @@ RAW_LOGO = """\
 |____/_/ \\_\\|_|"""
 
 
+def lap_logo() -> Text:
+    logo = Text(RAW_LOGO)
+    offset = 0
+    for line in RAW_LOGO.splitlines():
+        logo.stylize('#E53935', offset + 5, offset + 12)
+        offset += len(line) + 1
+    return logo
+
+
 class SecretInput(FormInput):
     """Do not offer clipboard-copy shortcuts or selection on focus for secrets."""
     def on_unmount(self):
@@ -34,8 +43,9 @@ class SecretInput(FormInput):
 
 class ClearDataScreen(ArrowScreen):
     def compose(self) -> ComposeResult:
+        with Horizontal(id='logo-header'):
+            yield Static(lap_logo(), id='lock-icon', markup=False)
         with VerticalScroll(id='clear-dialog'):
-            yield Static('\n'.join(line.ljust(17) for line in RAW_LOGO.splitlines()), id='lock-icon', markup=False)
             yield Static('Delete all vault data?', classes='title')
             yield Static('All saved accounts will be deleted.\nThis cannot be undone.')
             with Horizontal(id='clear-actions'):
@@ -60,8 +70,9 @@ class LoginScreen(ArrowScreen):
         self.pending_keys = None
 
     def compose(self) -> ComposeResult:
+        with Horizontal(id='logo-header'):
+            yield Static(lap_logo(), id='lock-icon', markup=False)
         with VerticalScroll(id='login-form'):
-            yield Static('\n'.join(line.ljust(17) for line in RAW_LOGO.splitlines()), id='lock-icon', markup=False)
             yield Static('MASTER PASSWORD', id='login-title')
             yield SecretInput(password=True, id='master', select_on_focus=False)
             yield Checkbox('Show password', id='visible')
