@@ -37,7 +37,7 @@ The master password is masked with asterisks. Select **Show password** and press
 
 Use ordinary characters to enter text and Backspace/Delete to correct it. Tab and action shortcuts are disabled.
 
-The application automatically locks 30 minutes after unlocking, regardless of activity. The timeout is checked once per second. Locking closes the database, wipes the application's mutable generation-key buffer, hides the account list, and shows an empty, masked login field. Esc locks the account list immediately.
+The application automatically locks after 30 minutes by default, regardless of activity. Select the countdown next to **+ Add** and press Enter to choose **30 min**, **1h**, or **3h**. Use the arrow keys and Enter to save, or Esc to cancel. Saving restarts the countdown and stores the interval in the encrypted database for future sessions. The setting is loaded after unlocking; existing databases get the settings table automatically. Interval validation happens in Python; the settings table has no field constraints. The timeout is checked once per second. Locking closes the database, wipes the application's mutable generation-key buffer, hides the account list, and shows an empty, masked login field. Esc locks the account list immediately.
 
 Copied passwords are cleared from the clipboard after 30 seconds if its contents have not changed. Locking and normal shutdown also attempt to clear the application's copied value. Clipboard history managers may retain copies; cleanup cannot be guaranteed after a crash or forced termination.
 

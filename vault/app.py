@@ -10,8 +10,8 @@ import pyperclip
 from textual.app import App
 
 from .screens import LoginScreen
+from .storage import LOCK_SECONDS
 
-LOCK_SECONDS = 1800
 DEFAULT_DB = Path(__file__).resolve().parent.parent / "vault.db"
 
 
@@ -35,10 +35,20 @@ class VaultApp(App, inherit_bindings=False):
     def ensure_unlocked(self):
         if self.session is None:
             return False
-        if time.time() - self.unlocked_at >= LOCK_SECONDS:
+        if time.time() - self.unlocked_at >= self.lock_seconds:
             self.lock()
             return False
         return True
+
+    def set_lock_interval(self, seconds: int):
+        if self.session is None:
+            raise RuntimeError('Vault is locked')
+        self.session.set_lock_interval(seconds)
+        self.unlocked_at = time.time()
+
+    @property
+    def lock_seconds(self):
+        return self.session.lock_seconds if self.session is not None else LOCK_SECONDS
 
     def check_timeout(self):
         if self.session is not None:

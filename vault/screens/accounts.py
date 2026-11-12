@@ -1,10 +1,13 @@
 from functools import partial
+from math import ceil
+import time
 
 import pyperclip
 from rich.text import Text
 from sqlcipher3 import dbapi2 as sqlcipher
 from textual.app import ComposeResult
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Static
 
 from .widgets import ArrowScreen, FormInput, lap_logo
@@ -14,7 +17,9 @@ class AccountsScreen(ArrowScreen):
     def compose(self) -> ComposeResult:
         with Horizontal(id='accounts-header'):
             yield Static(lap_logo(), id='lock-icon', markup=False)
-            yield Button('+ Add', id='add', variant='primary')
+            with Horizontal(id='accounts-actions'):
+                yield Button('+ Add', id='add', variant='primary')
+                yield Button('', id='lock-timer', tooltip='Auto-lock interval')
         with VerticalScroll(id='accounts'):
             for index, email in enumerate(self.app.session.emails()):
                 name, domain = email.rsplit('@', 1)
@@ -31,17 +36,33 @@ class AccountsScreen(ArrowScreen):
         yield Static('↑↓ Select  Enter OK  Esc Lock', id='hint')
 
     def on_mount(self):
+        self.update_lock_timer()
+        self.set_interval(1, self.update_lock_timer)
         email = self.app.last_added
         self.app.last_added = None
         buttons = list(self.query(Button))
         next((b for b in buttons if b.name == email and b.id.startswith('copy-')),
              self.query_one('#add', Button)).focus()
 
+    def update_lock_timer(self):
+        minutes = max(0, ceil((self.app.lock_seconds - (time.time() - self.app.unlocked_at)) / 60))
+        timer = self.query_one('#lock-timer', Button)
+        icon = '✎' if timer.has_focus else ' '
+        timer.label = f'{minutes} min {icon}'
+
+    def on_descendant_focus(self):
+        self.update_lock_timer()
+
+    def on_descendant_blur(self):
+        self.update_lock_timer()
+
     def on_button_pressed(self, event: Button.Pressed):
         if not self.app.ensure_unlocked():
             return
         if event.button.id == 'add':
             self.app.push_screen(AddScreen())
+        elif event.button.id == 'lock-timer':
+            self.app.push_screen(LockIntervalScreen(), self.interval_closed)
         elif event.button.has_class('delete-account'):
             masked_email = str(event.button.parent.query_one('.email', Static).render())
             self.app.push_screen(DeleteAccountScreen(masked_email),
@@ -53,6 +74,10 @@ class AccountsScreen(ArrowScreen):
             except pyperclip.PyperclipException:
                 self.query_one('#status', Static).update('Clipboard unavailable: check your system backend')
 
+    def interval_closed(self, saved: bool):
+        if self.app.session is not None:
+            self.update_lock_timer()
+
     def delete_account(self, email: str, confirmed: bool):
         if not confirmed or not self.app.ensure_unlocked():
             return
@@ -62,6 +87,34 @@ class AccountsScreen(ArrowScreen):
             self.query_one('#status', Static).update('Cannot delete account. Check database access and try again')
             return
         self.app.switch_screen(AccountsScreen())
+
+
+class LockIntervalScreen(ArrowScreen, ModalScreen):
+    def compose(self) -> ComposeResult:
+        with Vertical(id='interval-dialog'):
+            yield Static('Auto-lock interval', id='interval-title')
+            for seconds, label in ((1800, '30 min'), (3600, '1h'), (10800, '3h')):
+                marker = '●' if self.app.lock_seconds == seconds else ' '
+                yield Button(f'{marker} {label}', id=f'interval-{seconds}')
+            yield Static('', id='interval-status', markup=False)
+            yield Static('↑↓ Select  Enter Save\nEsc Cancel', id='interval-hint')
+
+    def on_mount(self):
+        self.query_one(f'#interval-{self.app.lock_seconds}', Button).focus()
+
+    def on_button_pressed(self, event: Button.Pressed):
+        event.stop()
+        if not self.app.ensure_unlocked():
+            return
+        try:
+            self.app.set_lock_interval(int(event.button.id.removeprefix('interval-')))
+        except sqlcipher.Error:
+            self.query_one('#interval-status', Static).update('Cannot save interval. Check database access and try again')
+            return
+        self.dismiss(True)
+
+    def action_back(self):
+        self.dismiss(False)
 
 
 class DeleteAccountScreen(ArrowScreen):

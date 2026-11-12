@@ -80,7 +80,148 @@ class CryptoTests(unittest.TestCase):
             reopened.close()
 
 
+class SettingsTests(unittest.TestCase):
+    def test_interval_upsert_updates_existing_row_without_deleting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            session = vault.VaultSession.open(Path(directory) / 'vault.db', 'test master phrase')
+            try:
+                session.set_lock_interval(3600)
+                session.connection.execute(
+                    "CREATE TRIGGER keep_settings BEFORE DELETE ON settings "
+                    "BEGIN SELECT RAISE(ABORT, 'Settings must be updated'); END")
+                session.set_lock_interval(10800)
+                self.assertEqual(session.connection.execute(
+                    'SELECT rowid, lock_seconds FROM settings').fetchall(), [(1, 10800)])
+                self.assertEqual(session.lock_seconds, 10800)
+            finally:
+                session.close()
+
+    def test_interval_settings_validate_and_persist(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'vault.db'
+            session = vault.VaultSession.open(path, 'test master phrase')
+            self.assertEqual(session.lock_seconds, 1800)
+            for value in (None, 'broken', 60):
+                with session.connection:
+                    session.connection.execute('DELETE FROM settings')
+                    session.connection.execute('INSERT INTO settings VALUES (?)', (value,))
+                session.close()
+                session = vault.VaultSession.open(path, 'test master phrase')
+                self.assertEqual(session.lock_seconds, 1800)
+            for seconds in (3600, 10800, 1800):
+                session.set_lock_interval(seconds)
+                session.close()
+                session = vault.VaultSession.open(path, 'test master phrase')
+                self.assertEqual(session.lock_seconds, seconds)
+            for invalid in (True, 60, '3600'):
+                with self.assertRaises(ValueError):
+                    session.set_lock_interval(invalid)
+            session.connection.execute('PRAGMA query_only = ON')
+            from sqlcipher3 import dbapi2 as sqlcipher
+            with self.assertRaises(sqlcipher.OperationalError):
+                session.set_lock_interval(3600)
+            self.assertEqual(session.lock_seconds, 1800)
+            self.assertEqual(session.connection.execute('SELECT * FROM settings').fetchall(), [(1800,)])
+            session.close()
+            with self.assertRaises(RuntimeError):
+                session.set_lock_interval(3600)
+
+    def test_existing_database_gets_settings_without_changing_accounts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'vault.db'
+            session = vault.VaultSession.open(path, 'test master phrase')
+            session.add('alice@example.com')
+            with session.connection:
+                session.connection.execute('DROP TABLE IF EXISTS settings')
+            session.close()
+            session = vault.VaultSession.open(path, 'test master phrase')
+            self.assertEqual(session.lock_seconds, 1800)
+            self.assertEqual(session.emails(), ['alice@example.com'])
+            session.set_lock_interval(10800)
+            session.close()
+
+
 class UITests(unittest.IsolatedAsyncioTestCase):
+    async def test_lock_interval_selection_cancel_persistence_and_timeout(self):
+        import time
+        from textual.widgets import Button, Static
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'vault.db'
+            app = vault.VaultApp(path)
+            async with app.run_test(size=(80, 24)) as pilot:
+                app.session = vault.VaultSession.open(path, 'test master phrase')
+                app.unlocked_at = time.time() - 600
+                await app.switch_screen(vault.AccountsScreen())
+                await pilot.press('down', 'enter')
+                self.assertEqual(app.focused.id, 'interval-1800')
+                self.assertIn('●', str(app.focused.label))
+                await pilot.press('down', 'escape')
+                self.assertEqual(app.lock_seconds, 1800)
+                self.assertEqual(app.session.connection.execute('SELECT * FROM settings').fetchall(), [])
+                self.assertEqual(app.focused.id, 'lock-timer')
+                await pilot.press('enter', 'down')
+                from sqlcipher3 import dbapi2 as sqlcipher
+                with patch.object(app.session, 'set_lock_interval', side_effect=sqlcipher.OperationalError):
+                    await pilot.press('enter')
+                self.assertEqual(app.lock_seconds, 1800)
+                self.assertIn('Cannot save', str(app.screen.query_one('#interval-status', Static).render()))
+                await pilot.press('enter')
+                self.assertIsInstance(app.screen, vault.AccountsScreen)
+                self.assertEqual(app.lock_seconds, 3600)
+                self.assertLess(time.time() - app.unlocked_at, 5)
+                self.assertEqual(str(app.screen.query_one('#lock-timer', Button).label), '60 min ✎')
+                reopened = vault.VaultSession.open(path, 'test master phrase')
+                self.assertEqual(reopened.lock_seconds, 3600)
+                reopened.close()
+                await pilot.press('enter')
+                self.assertEqual(app.focused.id, 'interval-3600')
+                for width in (28, 80):
+                    await pilot.resize_terminal(width, 14)
+                    await pilot.pause()
+                    for button in app.screen.query(Button):
+                        self.assertLessEqual(button.region.right, width)
+                        self.assertLessEqual(button.region.bottom, 14)
+                await pilot.press('down', 'enter')
+                self.assertEqual(app.lock_seconds, 10800)
+                reopened = vault.VaultSession.open(path, 'test master phrase')
+                self.assertEqual(reopened.lock_seconds, 10800)
+                reopened.close()
+                app.unlocked_at -= 3601
+                self.assertTrue(app.ensure_unlocked())
+                await pilot.press('enter')
+                app.unlocked_at -= 7200
+                app.check_timeout()
+                await pilot.pause()
+                self.assertIsNone(app.session)
+                self.assertIsInstance(app.screen, vault.LoginScreen)
+
+    async def test_lock_timer_updates_and_stays_right_of_add(self):
+        import time
+        from textual.widgets import Button, Static
+        with tempfile.TemporaryDirectory() as directory:
+            app = vault.VaultApp(Path(directory) / 'vault.db')
+            async with app.run_test(size=(80, 24)) as pilot:
+                app.session = vault.VaultSession.open(app.db_path, 'test master phrase')
+                app.unlocked_at = time.time()
+                await app.switch_screen(vault.AccountsScreen())
+                await pilot.pause()
+                timer = app.screen.query_one('#lock-timer', Button)
+                self.assertEqual(str(timer.label), '30 min  ')
+                await pilot.press('down')
+                self.assertEqual(str(timer.label), '30 min ✎')
+                app.unlocked_at -= 60
+                await pilot.pause(1.1)
+                self.assertEqual(str(timer.label), '29 min ✎')
+                await pilot.press('up')
+                self.assertEqual(str(timer.label), '29 min  ')
+                for width in (28, 40, 80):
+                    await pilot.resize_terminal(width, 24)
+                    await pilot.pause()
+                    add = app.screen.query_one('#add', Button)
+                    self.assertGreaterEqual(timer.region.x, add.region.right)
+                    self.assertEqual(timer.region.y, add.region.y)
+                    self.assertLessEqual(timer.region.right, width)
+
     async def test_delete_account_requires_confirmation_and_preserves_other_accounts(self):
         import time
         from sqlcipher3 import dbapi2 as sqlcipher
