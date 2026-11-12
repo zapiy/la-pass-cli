@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import os
+import sys
 import time
 from pathlib import Path
 import pyperclip
@@ -83,3 +85,19 @@ class VaultApp(App, inherit_bindings=False):
         self.clear_clipboard()
 
 
+def resize_terminal() -> None:
+    """Request a minimum startup size when the terminal supports XTWINOPS."""
+    try:
+        if not sys.stdout.isatty():
+            return
+        columns, lines = os.get_terminal_size(sys.stdout.fileno())
+        if columns < 80 or lines < 24:
+            sys.stdout.write(f'\x1b[8;{max(lines, 24)};{max(columns, 80)}t')
+            sys.stdout.flush()
+    except OSError:
+        pass
+
+
+def main() -> None:
+    resize_terminal()
+    VaultApp().run()

@@ -5,6 +5,36 @@ import vault
 from unittest.mock import patch
 
 
+class TerminalTests(unittest.TestCase):
+    def test_resize_only_grows_dimensions_below_minimum(self):
+        import os
+        from vault.app import resize_terminal
+        for size, expected in (((40, 14), '\x1b[8;24;80t'),
+                               ((120, 14), '\x1b[8;24;120t'),
+                               ((40, 40), '\x1b[8;40;80t'),
+                               ((80, 24), None), ((120, 40), None)):
+            with self.subTest(size=size), patch('vault.app.sys.stdout') as output, patch(
+                    'vault.app.os.get_terminal_size', return_value=os.terminal_size(size)):
+                output.isatty.return_value = True
+                resize_terminal()
+                if expected is None:
+                    output.write.assert_not_called()
+                else:
+                    output.write.assert_called_once_with(expected)
+                    output.flush.assert_called_once()
+
+    def test_resize_skips_redirected_output_and_unavailable_terminal(self):
+        from vault.app import resize_terminal
+        with patch('vault.app.sys.stdout') as output, patch(
+                'vault.app.os.get_terminal_size', side_effect=OSError) as get_size:
+            output.isatty.return_value = False
+            resize_terminal()
+            get_size.assert_not_called()
+            output.isatty.return_value = True
+            resize_terminal()
+            output.write.assert_not_called()
+
+
 class CryptoTests(unittest.TestCase):
     def test_canonical_email(self):
         self.assertEqual(vault.canonical_email(' Alice@EXAMPLE.COM '), 'Alice@example.com')
@@ -67,8 +97,11 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                     self.assertLessEqual(button.region.right, width)
                     self.assertLessEqual(button.region.bottom, height)
                     self.assertLessEqual(field.region.right, width)
-                    self.assertLessEqual(button.region.width, 11)
-                    self.assertEqual(str(app.screen.query_one('#lock-icon').render()), 'ℓ')
+                    self.assertEqual(button.region.width, 17)
+                    self.assertEqual(field.region.x, app.screen.query_one('#visible').region.x)
+                    self.assertEqual(button.styles.background.hex, '#29B6F6')
+                    self.assertEqual(app.screen.query_one('#lock-icon').region.height, 4)
+                    self.assertEqual(str(app.screen.query_one('#lock-icon').render()).splitlines()[1].rstrip(), '| |    / \\  | _ \\')
                 app.session = vault.VaultSession.open(app.db_path, 'test master phrase')
                 app.session.add('long.account.name@example.com')
                 await app.switch_screen(vault.AccountsScreen())

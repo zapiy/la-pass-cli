@@ -13,6 +13,13 @@ from .accounts import AccountsScreen
 from .widgets import ArrowScreen, FormInput
 
 
+RAW_LOGO = """\
+ _      _    ___
+| |    / \\  | _ \\
+| |__ / _ \\ |  _/
+|____/_/ \\_\\|_|"""
+
+
 class SecretInput(FormInput):
     """Do not offer clipboard-copy shortcuts or selection on focus for secrets."""
     def on_unmount(self):
@@ -31,14 +38,19 @@ class LoginScreen(ArrowScreen):
         self.pending_keys = None
 
     def compose(self) -> ComposeResult:
-        yield Static('ℓ', id='lock-icon', markup=False)
         with VerticalScroll(id='login-form'):
+            yield Static('\n'.join(line.ljust(17) for line in RAW_LOGO.splitlines()), id='lock-icon', markup=False)
             yield Static('MASTER PASSWORD', id='login-title')
             yield SecretInput(password=True, id='master', select_on_focus=False)
             yield Checkbox('Show password', id='visible')
             yield Button('Unlock', id='unlock', variant='primary')
             yield Static('', id='status', markup=False)
         yield Static('↑↓ Select  ←→ Cursor  Enter OK  Esc Exit', id='hint')
+
+    def on_resize(self):
+        super().on_resize()
+        if self.focused is not None:
+            self.call_after_refresh(self.focused.scroll_visible, animate=False)
 
     def on_mount(self):
         self.query_one('#master', Input).focus()

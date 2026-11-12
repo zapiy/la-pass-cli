@@ -84,6 +84,8 @@ This application has not undergone an independent security audit.
 
 Tests use temporary encrypted databases and synthetic credentials. Keyboard flows run through Textual's headless test pilot. Clipboard ownership and cleanup are tested with an in-memory backend without overwriting the user's system clipboard.
 
+At startup, the CLI requests at least 80 columns and 24 rows, preserving dimensions already above the minimum. Terminals that ignore window resize requests retain their current size; the interface remains responsive. Redirected output sends no resize sequence.
+
 ## Project layout
 
 ```text

@@ -1,3 +1,3 @@
-from .app import VaultApp
+from .app import main
 
-VaultApp().run()
+main()

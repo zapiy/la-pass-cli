@@ -1,11 +1,14 @@
+$primary: #B2DFDB;
+$accent: #B2DFDB;
+
 Screen { background: #101820; color: #e2e8f0; padding: 2 4; }
 Screen.narrow { padding: 1; }
 Screen.short { padding-top: 0; padding-bottom: 0; }
 Input { width: 48; max-width: 100%; }
-Input:focus, Button:focus, Checkbox:focus { border: heavy #57d8bc; }
+Input:focus, Button:focus, Checkbox:focus { border: heavy #B2DFDB; }
 Button { min-width: 11; width: 11; margin: 0 1 0 0; }
-.title { height: 3; text-style: bold; color: #57d8bc; }
-#lock-icon { dock: top; width: 100%; height: 1; text-align: right; color: #57d8bc; }
+.title { height: 3; text-style: bold; color: #B2DFDB; }
+#lock-icon { width: 100%; height: 4; text-align: right; color: #B2DFDB; }
 #login-form { height: 1fr; align-vertical: middle; }
 #login-title { height: 1; margin-bottom: 1; }
 #visible { margin-top: 2; margin-bottom: 1; max-width: 100%; }
@@ -19,3 +22,11 @@ Button { min-width: 11; width: 11; margin: 0 1 0 0; }
 Screen.short #visible { margin-top: 1; margin-bottom: 0; }
 Screen.short #login-title { margin-bottom: 0; }
 Screen.short #status { margin-top: 0; }
+
+Button.-primary { background: #B2DFDB; color: #ffffff; }
+Button.-primary:hover { background: #C2185B; }
+#login-title { color: #B2DFDB; }
+LoginScreen Input, LoginScreen Checkbox { margin-left: 0; margin-right: 0; padding: 0 1; }
+#unlock { width: 17; max-width: 100%; background: #29B6F6; color: #ffffff; }
+#unlock:hover { background: #009688; }
+#unlock:focus { border: heavy #29B6F6; }
