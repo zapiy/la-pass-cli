@@ -81,6 +81,43 @@ class CryptoTests(unittest.TestCase):
 
 
 class UITests(unittest.IsolatedAsyncioTestCase):
+    async def test_delete_account_requires_confirmation_and_preserves_other_accounts(self):
+        import time
+        from sqlcipher3 import dbapi2 as sqlcipher
+        from textual.widgets import Button, Static
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'vault.db'
+            app = vault.VaultApp(path)
+            async with app.run_test(size=(80, 24)) as pilot:
+                app.session = vault.VaultSession.open(path, 'test master phrase')
+                for email in ('alice@example.com', 'bob@example.com'):
+                    app.session.add(email)
+                app.unlocked_at = time.time()
+                await app.switch_screen(vault.AccountsScreen())
+                await pilot.pause()
+                delete = app.screen.query_one('#delete-0', Button)
+                self.assertEqual(delete.styles.color.hex, '#E53935')
+                self.assertEqual(delete.region.height, 3)
+                await pilot.click('#delete-0')
+                self.assertEqual(app.focused.id, 'cancel-clear')
+                self.assertEqual(str(app.screen.query_one('#delete-email', Static).render()),
+                                 'a***e@example.com')
+                await pilot.press('escape')
+                self.assertEqual(len(app.session.emails()), 2)
+                await pilot.click('#delete-0')
+                with patch.object(app.session, 'delete', side_effect=sqlcipher.OperationalError('read only')):
+                    await pilot.click('#confirm-clear')
+                    self.assertIn('Cannot delete', str(app.screen.query_one('#status', Static).render()))
+                self.assertEqual(len(app.session.emails()), 2)
+                await pilot.click('#delete-0')
+                await pilot.click('#confirm-clear')
+                await pilot.pause()
+                self.assertEqual(app.session.emails(), ['bob@example.com'])
+                self.assertEqual(app.screen.query_one('#copy-0').name, 'bob@example.com')
+            reopened = vault.VaultSession.open(path, 'test master phrase')
+            self.assertEqual(reopened.emails(), ['bob@example.com'])
+            reopened.close()
+
     async def test_clear_vault_requires_confirmation_and_resets_login(self):
         from textual.widgets import Button, Input, Static
         with tempfile.TemporaryDirectory() as directory:

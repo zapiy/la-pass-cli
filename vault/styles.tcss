@@ -15,10 +15,13 @@ Button { min-width: 11; width: 11; margin: 0 1 0 0; }
 #visible { margin-top: 2; margin-bottom: 1; max-width: 100%; }
 #status { height: auto; min-height: 2; color: #f0c878; margin-top: 1; }
 #hint { dock: bottom; height: auto; color: #9aaebd; }
-#accounts-header { height: 3; }
-#accounts-header .title { width: 1fr; content-align-vertical: middle; }
-#add { background: #00695C; }
-#add:focus { border: heavy #00695C; }
+#accounts-header { height: 4; align-vertical: middle; }
+#accounts-header #lock-icon { width: 1fr; margin-right: 3; }
+#accounts-header #add { margin: 1 0 0 0; }
+Screen.narrow #accounts-header { layout: grid; grid-size: 1; grid-columns: 1fr; grid-rows: 4 3; height: 7; }
+Screen.narrow #accounts-header #add { margin: 0; }
+#add { background: #00695C; height: 3; min-height: 3; border: none; border-top: tall #00695C; border-bottom: tall #00695C; padding: 0 1; content-align: center middle; }
+#add:focus { border: none; border-top: tall #00695C; border-bottom: tall #00695C; text-style: bold; }
 #accounts { height: 1fr; margin-top: 1; }
 .account { height: 3; }
 .email { width: 1fr; padding-top: 1; }
@@ -38,8 +41,9 @@ LoginScreen Input, LoginScreen Checkbox { margin-left: 0; margin-right: 0; paddi
 #unlock:hover { background: #009688; }
 #unlock:focus { border: heavy #29B6F6; }
 #login-actions { height: 3; }
-#clear-data { width: 8; min-width: 8; height: 3; padding: 0; border: none; content-align: center middle; text-align: center; color: #E53935; background: transparent; }
-#clear-data:hover, #clear-data:focus { background: #352027; }
+#clear-data, .account .delete-account, .account .delete-account:focus { width: 8; min-width: 8; height: 3; min-height: 3; padding: 0; border: none; content-align: center middle; text-align: center; color: #E53935; background: transparent; }
+.account .delete-account, .account .delete-account:focus { margin: 0; }
+#clear-data:hover, #clear-data:focus, .account .delete-account:hover, .account .delete-account:focus { background: #352027; }
 #clear-dialog, #add-form { height: 1fr; align-vertical: middle; }
 #clear-actions { height: 3; margin-top: 1; }
 #clear-actions Button { width: 12; min-width: 12; content-align: center middle; text-align: center; }

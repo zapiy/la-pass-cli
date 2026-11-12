@@ -68,6 +68,12 @@ class VaultSession:
             raise ValueError('This email has already been added') from None
         return email
 
+    def delete(self, email: str) -> None:
+        if self.connection is None:
+            raise RuntimeError('Vault is locked')
+        with self.connection:
+            self.connection.execute('DELETE FROM accounts WHERE email = ?', (email,))
+
     def password(self, email: str) -> str:
         if self.connection is None:
             raise RuntimeError('Vault is locked')
