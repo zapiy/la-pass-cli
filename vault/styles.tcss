@@ -38,6 +38,10 @@ LockIntervalScreen { align: center middle; background: #101820 65%; padding: 0 1
 .account { height: 3; }
 .email { width: 1fr; padding-top: 1; }
 .account Button { width: 12; }
+.account .show-email { width: 6; min-width: 6; }
+Screen.narrow .account { layout: grid; grid-size: 3; grid-columns: 1fr 6 8; grid-rows: auto 3; height: auto; }
+Screen.narrow .email { column-span: 3; height: auto; padding-top: 0; }
+Screen.narrow .account Button { width: 100%; min-width: 0; }
 #add-actions { height: 3; margin-top: 1; }
 #save { background: #00695C; }
 #save:focus { border: heavy #00695C; }

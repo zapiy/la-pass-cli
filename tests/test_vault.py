@@ -371,6 +371,30 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                     [str(email.render()) for email in app.screen.query('.email')],
                     ['a@example.com', 'a*@example.com', 'a*c@example.com', 'a***e@example.com'])
 
+    async def test_show_email_toggles_only_selected_account(self):
+        import time
+        from textual.widgets import Button
+        with tempfile.TemporaryDirectory() as directory:
+            app = vault.VaultApp(Path(directory) / 'vault.db')
+            async with app.run_test(size=(80, 24)) as pilot:
+                app.session = vault.VaultSession.open(app.db_path, 'test master phrase')
+                for email in ('alice@example.com', 'bob@example.com'):
+                    app.session.add(email)
+                app.unlocked_at = time.time()
+                await app.switch_screen(vault.AccountsScreen())
+                await pilot.pause()
+                show = app.screen.query_one('#show-0', Button)
+                copy = app.screen.query_one('#copy-0', Button)
+                self.assertGreaterEqual(show.region.x, copy.region.right)
+                await pilot.click('#show-0')
+                self.assertEqual([str(email.render()) for email in app.screen.query('.email')],
+                                 ['alice@example.com', 'b*b@example.com'])
+                self.assertEqual(str(show.label), '⊘')
+                await pilot.pause(0.1)
+                await pilot.click('#show-0')
+                self.assertEqual(str(app.screen.query_one('.email').render()), 'a***e@example.com')
+                self.assertEqual(str(show.label), '◉')
+
     async def test_added_account_is_visible_in_list(self):
         import time
         from textual.widgets import Input, Static

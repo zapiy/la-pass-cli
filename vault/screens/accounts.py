@@ -13,6 +13,15 @@ from textual.widgets import Button, Input, Static
 from .widgets import ArrowScreen, FormInput, lap_logo
 
 
+def mask_email(email: str) -> str:
+    name, domain = email.rsplit('@', 1)
+    if len(name) > 2:
+        name = name[0] + '*' * (len(name) - 2) + name[-1]
+    else:
+        name = name[0] + '*' * (len(name) - 1)
+    return f'{name}@{domain}'
+
+
 class AccountsScreen(ArrowScreen):
     def compose(self) -> ComposeResult:
         with Horizontal(id='accounts-header'):
@@ -22,14 +31,10 @@ class AccountsScreen(ArrowScreen):
                 yield Button('', id='lock-timer', tooltip='Auto-lock interval')
         with VerticalScroll(id='accounts'):
             for index, email in enumerate(self.app.session.emails()):
-                name, domain = email.rsplit('@', 1)
-                if len(name) > 2:
-                    masked_name = name[0] + '*' * (len(name) - 2) + name[-1]
-                else:
-                    masked_name = name[0] + '*' * (len(name) - 1)
                 with Horizontal(classes='account'):
-                    yield Static(f'{masked_name}@{domain}', markup=False, classes='email')
+                    yield Static(mask_email(email), markup=False, classes='email')
                     yield Button('Copy', id=f'copy-{index}', name=email)
+                    yield Button('◉', id=f'show-{index}', name=email, classes='show-email', tooltip='Show email')
                     yield Button(Text('_[]_\n|><|\n|__|'), id=f'delete-{index}',
                                  name=email, classes='delete-account', tooltip='Delete account')
         yield Static('', id='status', markup=False)
@@ -63,6 +68,12 @@ class AccountsScreen(ArrowScreen):
             self.app.push_screen(AddScreen())
         elif event.button.id == 'lock-timer':
             self.app.push_screen(LockIntervalScreen(), self.interval_closed)
+        elif event.button.has_class('show-email'):
+            showing = str(event.button.label) == '⊘'
+            event.button.parent.query_one('.email', Static).update(
+                mask_email(event.button.name) if showing else event.button.name)
+            event.button.label = '◉' if showing else '⊘'
+            event.button.tooltip = 'Show email' if showing else 'Hide email'
         elif event.button.has_class('delete-account'):
             masked_email = str(event.button.parent.query_one('.email', Static).render())
             self.app.push_screen(DeleteAccountScreen(masked_email),
