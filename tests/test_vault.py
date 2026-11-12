@@ -81,6 +81,67 @@ class CryptoTests(unittest.TestCase):
 
 
 class UITests(unittest.IsolatedAsyncioTestCase):
+    async def test_clear_vault_requires_confirmation_and_resets_login(self):
+        from textual.widgets import Button, Input, Static
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'vault.db'
+            session = vault.VaultSession.open(path, 'test master phrase')
+            session.add('alice@example.com')
+            session.close()
+            app = vault.VaultApp(path)
+            async with app.run_test(size=(80, 24)) as pilot:
+                login = app.screen
+                clear = login.query_one('#clear-data', Button)
+                unlock = login.query_one('#unlock', Button)
+                self.assertGreaterEqual(clear.region.x, unlock.region.right)
+                self.assertEqual(clear.styles.color.hex, '#E53935')
+                for cancel in ('enter', 'escape'):
+                    await pilot.click('#clear-data')
+                    self.assertEqual(app.focused.id, 'cancel-clear')
+                    self.assertTrue(path.exists())
+                    await pilot.press(cancel)
+                    self.assertIs(app.screen, login)
+                    self.assertTrue(path.exists())
+                login.query_one('#master', Input).value = 'secret'
+                for suffix in ('-wal', '-shm', '-journal'):
+                    Path(str(path) + suffix).write_bytes(b'sidecar')
+                await pilot.click('#clear-data')
+                await pilot.click('#confirm-clear')
+                self.assertIs(app.screen, login)
+                self.assertFalse(path.exists())
+                for suffix in ('-wal', '-shm', '-journal'):
+                    self.assertFalse(Path(str(path) + suffix).exists())
+                self.assertEqual(login.query_one('#master', Input).value, '')
+                self.assertTrue(clear.disabled)
+                self.assertIn('First run', str(login.query_one('#status', Static).render()))
+                for _ in range(2):
+                    login.query_one('#master', Input).value = 'new master phrase'
+                    await pilot.press('enter')
+                self.assertIsNotNone(app.session)
+                self.assertEqual(app.session.emails(), [])
+
+    async def test_clear_vault_failure_and_missing_storage(self):
+        from textual.widgets import Button, Static
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'vault.db'
+            app = vault.VaultApp(path)
+            async with app.run_test(size=(28, 14)) as pilot:
+                clear = app.screen.query_one('#clear-data', Button)
+                self.assertTrue(clear.disabled)
+                self.assertLessEqual(clear.region.right, 28)
+            path.write_bytes(b'encrypted data')
+            app = vault.VaultApp(path)
+            async with app.run_test(size=(28, 14)) as pilot:
+                login = app.screen
+                login.query_one('#clear-data', Button).focus()
+                await pilot.pause()
+                await pilot.press('enter')
+                with patch.object(Path, 'unlink', side_effect=PermissionError):
+                    await pilot.press('right', 'enter')
+                self.assertTrue(path.exists())
+                self.assertIs(app.screen, login)
+                self.assertIn('Cannot delete', str(login.query_one('#status', Static).render()))
+
     async def test_menu_resizes_without_hiding_controls(self):
         from textual.widgets import Button, Input
         with tempfile.TemporaryDirectory() as directory:

@@ -30,3 +30,11 @@ LoginScreen Input, LoginScreen Checkbox { margin-left: 0; margin-right: 0; paddi
 #unlock { width: 17; max-width: 100%; background: #29B6F6; color: #ffffff; }
 #unlock:hover { background: #009688; }
 #unlock:focus { border: heavy #29B6F6; }
+#login-actions { height: 3; }
+#clear-data { width: 8; min-width: 8; height: 3; padding: 0; border: none; content-align: center middle; text-align: center; color: #E53935; background: transparent; }
+#clear-data:hover, #clear-data:focus { background: #352027; }
+#clear-dialog { height: 1fr; align-vertical: middle; }
+#clear-actions { height: 3; margin-top: 1; }
+#clear-actions Button { width: 12; min-width: 12; content-align: center middle; text-align: center; }
+#confirm-clear { background: #E53935; color: #ffffff; }
+#confirm-clear:focus { border: heavy #E53935; }
