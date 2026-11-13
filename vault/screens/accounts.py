@@ -97,6 +97,20 @@ class AccountsScreen(ArrowScreen):
                 self._search_timer.stop()
             self._search_timer = self.set_timer(self.SEARCH_DELAY, self.apply_search)
 
+    def action_left(self):
+        field = self.focused
+        if isinstance(field, Input) and field.id == 'search' and field.cursor_position == 0:
+            self.focus_previous('Button, Input')
+        else:
+            super().action_left()
+
+    def action_right(self):
+        field = self.focused
+        if isinstance(field, Input) and field.id == 'search' and field.cursor_position == len(field.value):
+            self.focus_next('Button, Input')
+        else:
+            super().action_right()
+
     def apply_search(self):
         self._search_timer = None
         query = self.query_one('#search', Input).value.casefold()
@@ -119,7 +133,7 @@ class AccountsScreen(ArrowScreen):
         if not self.app.ensure_unlocked():
             return
         if event.button.id == 'add':
-            self.app.push_screen(AddScreen())
+            self.app.push_screen(AddAccountModal())
         elif event.button.id == 'lock-timer':
             self.app.push_screen(LockIntervalScreen(), self.interval_closed)
         elif event.button.has_class('show-email'):
@@ -130,7 +144,7 @@ class AccountsScreen(ArrowScreen):
             event.button.tooltip = 'Show email' if showing else 'Hide email'
         elif event.button.has_class('delete-account'):
             masked_email = str(event.button.parent.query_one('.email', Static).render())
-            self.app.push_screen(DeleteAccountScreen(masked_email),
+            self.app.push_screen(DeleteAccountModal(masked_email),
                                  partial(self.delete_account, event.button.name))
         elif event.button.name:
             try:
@@ -182,22 +196,20 @@ class LockIntervalScreen(ArrowScreen, ModalScreen):
         self.dismiss(False)
 
 
-class DeleteAccountScreen(ArrowScreen):
+class DeleteAccountModal(ArrowScreen, ModalScreen):
     def __init__(self, masked_email: str):
         super().__init__()
         self.masked_email = masked_email
 
     def compose(self) -> ComposeResult:
-        with Horizontal(id='logo-header'):
-            yield Static(lap_logo(), id='lock-icon', markup=False)
         with VerticalScroll(id='clear-dialog'):
-            yield Static('Delete this account?', classes='title')
+            yield Static('Delete this account?', classes='modal-title')
             yield Static(self.masked_email, id='delete-email', markup=False)
             yield Static('The selected account will be removed from the vault.')
             with Horizontal(id='clear-actions'):
                 yield Button('Cancel', id='cancel-clear')
                 yield Button('Delete', id='confirm-clear')
-        yield Static('↑↓ Select  ←→ Cursor  Enter OK  Esc Cancel', id='hint')
+            yield Static('←→ Cursor  Enter OK  Esc Cancel', classes='modal-hint')
 
     def on_mount(self):
         self.query_one('#cancel-clear', Button).focus()
@@ -210,18 +222,16 @@ class DeleteAccountScreen(ArrowScreen):
         self.dismiss(False)
 
 
-class AddScreen(ArrowScreen):
+class AddAccountModal(ArrowScreen, ModalScreen):
     def compose(self) -> ComposeResult:
-        with Horizontal(id='logo-header'):
-            yield Static(lap_logo(), id='lock-icon', markup=False)
         with VerticalScroll(id='add-form'):
-            yield Static('ADD ACCOUNT', classes='title')
+            yield Static('ADD ACCOUNT', classes='modal-title')
             yield FormInput(placeholder='alice@example.com', id='email')
             with Horizontal(id='add-actions'):
                 yield Button('Add', id='save', variant='primary')
                 yield Button('Cancel', id='cancel')
             yield Static('', id='status', markup=False)
-        yield Static('↑↓ Select  ←→ Cursor  Enter OK  Esc Cancel', id='hint')
+            yield Static('↑↓ Select  ←→ Cursor  Enter OK  Esc Cancel', classes='modal-hint')
 
     def on_mount(self):
         self.query_one(Input).focus()
@@ -242,6 +252,7 @@ class AddScreen(ArrowScreen):
         self.app.switch_screen(AccountsScreen())
 
     async def on_button_pressed(self, event: Button.Pressed):
+        event.stop()
         if event.button.id == 'cancel':
             self.action_back()
         else:

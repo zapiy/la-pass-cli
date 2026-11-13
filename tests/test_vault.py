@@ -150,6 +150,41 @@ class SettingsTests(unittest.TestCase):
 
 
 class UITests(unittest.IsolatedAsyncioTestCase):
+    async def test_search_arrows_move_focus_at_text_boundaries(self):
+        import time
+        from textual.widgets import Input
+        with tempfile.TemporaryDirectory() as directory:
+            app = vault.VaultApp(Path(directory) / 'vault.db')
+            async with app.run_test() as pilot:
+                app.session = vault.VaultSession.open(app.db_path, 'test master phrase')
+                app.unlocked_at = time.time()
+                await app.switch_screen(vault.AccountsScreen())
+                search = app.screen.query_one('#search', Input)
+                search.focus()
+                await pilot.press('right')
+                self.assertEqual(app.focused.id, 'add')
+                search.focus()
+                await pilot.press('left')
+                self.assertEqual(app.focused.id, 'lock-timer')
+                search.value = 'abc'
+                search.focus()
+                await pilot.pause()
+                search.cursor_position = 1
+                await pilot.press('right')
+                self.assertIs(app.focused, search)
+                self.assertEqual(search.cursor_position, 2)
+                await pilot.press('left')
+                self.assertIs(app.focused, search)
+                self.assertEqual(search.cursor_position, 1)
+                search.cursor_position = 3
+                await pilot.press('right')
+                self.assertEqual(app.focused.id, 'add')
+                search.focus()
+                await pilot.pause()
+                search.cursor_position = 0
+                await pilot.press('left')
+                self.assertEqual(app.focused.id, 'lock-timer')
+
     async def test_short_master_password_is_rejected(self):
         from textual.widgets import Input, Static
         with tempfile.TemporaryDirectory() as directory:
@@ -249,6 +284,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                     self.assertLessEqual(timer.region.right, width)
 
     async def test_delete_account_requires_confirmation_and_preserves_other_accounts(self):
+        from textual.screen import ModalScreen
         import time
         from sqlcipher3 import dbapi2 as sqlcipher
         from textual.widgets import Button, Static
@@ -266,6 +302,9 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(delete.styles.color.hex, '#E53935')
                 self.assertEqual(delete.region.height, 3)
                 await pilot.click('#delete-0')
+                self.assertIsInstance(app.screen, ModalScreen)
+                self.assertFalse(app.screen.query('#logo-header'))
+                self.assertLess(app.screen.query_one('#clear-dialog').region.width, 80)
                 self.assertEqual(app.focused.id, 'cancel-clear')
                 self.assertEqual(str(app.screen.query_one('#delete-email', Static).render()),
                                  'a***e@example.com')
@@ -376,7 +415,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                 app.session = vault.VaultSession.open(app.db_path, 'test master phrase')
                 app.session.add('long.account.name@example.com')
                 await app.switch_screen(vault.AccountsScreen())
-                for screen in (app.screen, vault.AddScreen()):
+                for screen in (app.screen, vault.AddAccountModal()):
                     if screen is not app.screen:
                         await app.push_screen(screen)
                     for width, height in ((28, 14), (40, 18), (100, 32)):
@@ -460,6 +499,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(str(show.label), '◉')
 
     async def test_added_account_is_visible_in_list(self):
+        from textual.screen import ModalScreen
         import time
         from textual.widgets import Input, Static
         with tempfile.TemporaryDirectory() as directory:
@@ -469,6 +509,9 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                 app.unlocked_at = time.time()
                 await app.switch_screen(vault.AccountsScreen())
                 await pilot.click('#add')
+                self.assertIsInstance(app.screen, ModalScreen)
+                self.assertFalse(app.screen.query('#logo-header'))
+                self.assertLess(app.screen.query_one('#add-form').region.width, 80)
                 app.screen.query_one('#email', Input).value = 'alice@example.com'
                 await pilot.click('#save')
                 await pilot.pause()
@@ -545,7 +588,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(clipboard['value'], 'user replacement')
                     self.assertEqual(str(status.render()), 'Another message')
                     accounts.copy_password('alice@example.com')
-                    await app.push_screen(vault.AddScreen())
+                    await app.push_screen(vault.AddAccountModal())
                     app.lock()
                     await pilot.pause()
                     self.assertEqual(clipboard['value'], '')
@@ -555,7 +598,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                     await pilot.pause()
                 await pilot.press('enter')
                 await pilot.pause()
-                self.assertIsInstance(app.screen, vault.AddScreen)
+                self.assertIsInstance(app.screen, vault.AddAccountModal)
                 key = app.session.generation_key
                 app.unlocked_at -= 1801
                 app.check_timeout()

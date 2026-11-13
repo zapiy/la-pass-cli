@@ -1,2 +1,2 @@
-from .accounts import AccountsScreen, AddScreen
+from .accounts import AccountsScreen, AddAccountModal
 from .login import LoginScreen

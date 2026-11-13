@@ -26,7 +26,7 @@ class SecretInput(FormInput):
         return super()._value
 
 
-class ClearDataScreen(ArrowScreen, ModalScreen):
+class ClearDataModal(ArrowScreen, ModalScreen):
     def compose(self) -> ComposeResult:
         with VerticalScroll(id='clear-modal'):
             yield Static('Delete all vault data?', id='clear-title')
@@ -83,7 +83,7 @@ class LoginScreen(ArrowScreen):
         if event.button.id == 'unlock':
             self.submit()
         elif event.button.id == 'clear-data':
-            self.app.push_screen(ClearDataScreen(), self.clear_data)
+            self.app.push_screen(ClearDataModal(), self.clear_data)
 
     def clear_data(self, confirmed: bool):
         if not confirmed:
