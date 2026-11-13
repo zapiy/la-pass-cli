@@ -36,6 +36,19 @@ class TerminalTests(unittest.TestCase):
 
 
 class CryptoTests(unittest.TestCase):
+    def test_emails_sort_by_domain_then_name_without_case(self):
+        with tempfile.TemporaryDirectory() as directory:
+            session = vault.VaultSession.open(Path(directory) / 'vault.db', 'test master phrase')
+            try:
+                for email in ('alex@yandex.ru', 'Zoe@gmail.com', 'anna@mail.ru',
+                              'bob@gmail.com', 'alice@GMAIL.COM', 'Alice@gmail.com'):
+                    session.add(email)
+                self.assertEqual(session.emails(), [
+                    'Alice@gmail.com', 'alice@gmail.com', 'bob@gmail.com',
+                    'Zoe@gmail.com', 'anna@mail.ru', 'alex@yandex.ru'])
+            finally:
+                session.close()
+
     def test_master_password_minimum_length(self):
         for master in ('', 'a', 'ab', 'яю'):
             with self.subTest(master=master), self.assertRaises(ValueError):

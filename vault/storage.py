@@ -73,7 +73,10 @@ class VaultSession:
     def emails(self) -> list[str]:
         if self.connection is None:
             raise RuntimeError('Vault is locked')
-        return [row[0] for row in self.connection.execute('SELECT email FROM accounts ORDER BY email')]
+        return [row[0] for row in self.connection.execute(
+            "SELECT email FROM accounts ORDER BY "
+            "substr(email, instr(email, '@') + 1) COLLATE NOCASE, "
+            "substr(email, 1, instr(email, '@') - 1) COLLATE NOCASE, email")]
 
     def add(self, email: str) -> str:
         email = canonical_email(email)
