@@ -27,13 +27,14 @@ Screen.narrow #search { width: 100%; margin: 0; }
 Screen.narrow #accounts-header #add { margin: 0; }
 Screen.narrow #accounts-actions { height: 3; }
 Screen.narrow #lock-timer { margin-top: 0; }
-LockIntervalScreen { align: center middle; background: #101820 65%; padding: 0 1; }
-#interval-dialog { width: 40; max-width: 100%; height: auto; max-height: 100%; overflow-y: auto; padding: 1 2; border: round #B2DFDB; background: #101820; }
-#interval-title { height: 1; margin-bottom: 1; color: #B2DFDB; text-style: bold; }
+LockIntervalScreen, ClearDataScreen { align: center middle; background: #101820 65%; padding: 0 1; }
+#interval-dialog, #clear-modal { width: 40; max-width: 100%; height: auto; max-height: 100%; overflow-y: auto; padding: 1 2; border: round #B2DFDB; background: #101820; }
+#interval-title, #clear-title { height: auto; margin-bottom: 1; color: #B2DFDB; text-style: bold; }
+#interval-title { height: 1; }
 #interval-dialog Button { width: 100%; min-width: 0; height: 1; min-height: 1; border: none; padding: 0 1; margin: 0; text-align: left; }
 #interval-dialog Button:focus { background: #B2DFDB; color: #101820; text-style: bold; }
 #interval-status { height: auto; color: #f0c878; }
-#interval-hint { height: auto; margin-top: 1; color: #9aaebd; }
+#interval-hint, #clear-hint { height: auto; margin-top: 1; color: #9aaebd; }
 #add { background: #00695C; height: 3; min-height: 3; border: none; border-top: tall #00695C; border-bottom: tall #00695C; padding: 0 1; content-align: center middle; }
 #add:focus { background: #B2DFDB; color: #101820; border: none; border-top: tall #B2DFDB; border-bottom: tall #B2DFDB; text-style: bold; }
 #accounts { height: 1fr; margin-top: 1; }
@@ -65,5 +66,6 @@ LoginScreen Input, LoginScreen Checkbox { margin-left: 0; margin-right: 0; paddi
 #clear-dialog, #add-form { height: 1fr; align-vertical: middle; }
 #clear-actions { height: 3; margin-top: 1; }
 #clear-actions Button { width: 12; min-width: 12; content-align: center middle; text-align: center; }
+ClearDataScreen #clear-actions Button { width: 1fr; min-width: 0; }
 #confirm-clear { background: #E53935; color: #ffffff; }
 #confirm-clear:focus { border: heavy #E53935; }

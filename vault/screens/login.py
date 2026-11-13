@@ -5,6 +5,7 @@ from rich.text import Text
 from sqlcipher3 import dbapi2 as sqlcipher
 from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
+from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, Input, Static
 
 from ..crypto import derive_keys, wipe
@@ -25,17 +26,15 @@ class SecretInput(FormInput):
         return super()._value
 
 
-class ClearDataScreen(ArrowScreen):
+class ClearDataScreen(ArrowScreen, ModalScreen):
     def compose(self) -> ComposeResult:
-        with Horizontal(id='logo-header'):
-            yield Static(lap_logo(), id='lock-icon', markup=False)
-        with VerticalScroll(id='clear-dialog'):
-            yield Static('Delete all vault data?', classes='title')
+        with VerticalScroll(id='clear-modal'):
+            yield Static('Delete all vault data?', id='clear-title')
             yield Static('All saved accounts will be deleted.\nThis cannot be undone.')
             with Horizontal(id='clear-actions'):
                 yield Button('Cancel', id='cancel-clear')
                 yield Button('Delete', id='confirm-clear')
-        yield Static('↑↓ Select  ←→ Cursor  Enter OK  Esc Cancel', id='hint')
+            yield Static('←→ Cursor  Enter OK  Esc Cancel', id='clear-hint')
 
     def on_mount(self):
         self.query_one('#cancel-clear', Button).focus()

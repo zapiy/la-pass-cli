@@ -286,6 +286,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
             reopened.close()
 
     async def test_clear_vault_requires_confirmation_and_resets_login(self):
+        from textual.screen import ModalScreen
         from textual.widgets import Button, Input, Static
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'vault.db'
@@ -301,6 +302,11 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(clear.styles.color.hex, '#E53935')
                 for cancel in ('enter', 'escape'):
                     await pilot.click('#clear-data')
+                    self.assertIsInstance(app.screen, ModalScreen)
+                    self.assertFalse(app.screen.query('#logo-header'))
+                    dialog = app.screen.query_one('#clear-modal')
+                    self.assertLess(dialog.region.width, 80)
+                    self.assertLess(dialog.region.height, 24)
                     self.assertEqual(app.focused.id, 'cancel-clear')
                     self.assertTrue(path.exists())
                     await pilot.press(cancel)
