@@ -49,7 +49,7 @@ class AccountsScreen(ArrowScreen):
                     yield Button(Text('_[]_\n|  |\n|__|'), id=f'delete-{index}',
                                  name=email, classes='delete-account', tooltip='Delete account')
         yield Static('', id='status', markup=False)
-        yield Static('↑↓ Select  Enter OK  Esc Lock', id='hint')
+        yield Static('↑↓ Select  ←→ Cursor  Enter OK  Esc Lock', id='hint')
 
     def on_mount(self):
         self.update_lock_timer()

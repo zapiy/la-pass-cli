@@ -76,6 +76,27 @@ class CryptoTests(unittest.TestCase):
         for chars in (vault.UPPER, vault.LOWER, vault.DIGITS, vault.SYMBOLS):
             self.assertTrue(any(c in chars for c in password))
 
+    def test_generation_key_only_matches_existing_algorithm_and_wipes_root(self):
+        from vault import crypto
+        generation, database = crypto.derive_keys('test master phrase')
+        try:
+            with patch.object(crypto, 'wipe', wraps=crypto.wipe) as wipe_root:
+                once = crypto.derive_generation_key('test master phrase')
+            try:
+                self.assertEqual(once, generation)
+                self.assertEqual(crypto.generate_password(once, 'Alice@example.com'),
+                                 'WZUf-1GTVFDrUsDPGbcT1Oc)')
+                self.assertEqual(wipe_root.call_count, 1)
+                self.assertFalse(any(wipe_root.call_args.args[0]))
+            finally:
+                crypto.wipe(once)
+        finally:
+            crypto.wipe(generation)
+            crypto.wipe(database)
+        for master in ('', 'a', 'ab'):
+            with self.subTest(master=master), self.assertRaises(ValueError):
+                crypto.derive_generation_key(master)
+
     def test_encrypted_database_and_session_close(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'vault.db'
@@ -163,6 +184,69 @@ class SettingsTests(unittest.TestCase):
 
 
 class UITests(unittest.IsolatedAsyncioTestCase):
+    async def test_once_copies_existing_algorithm_without_database_or_cleanup(self):
+        from textual.widgets import Input, Button, Static
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'vault.db'
+            app = vault.VaultApp(path)
+            clipboard = {'value': ''}
+            with patch('pyperclip.copy', side_effect=lambda value: clipboard.update(value=value)):
+                async with app.run_test() as pilot:
+                    login = app.screen
+                    self.assertEqual([b.id for b in login.query('#login-actions Button')],
+                                     ['unlock', 'once', 'clear-data'])
+                    self.assertEqual(login.query_one('#once', Button).styles.background.hex, '#FFB300')
+                    login.query_one('#once', Button).focus()
+                    await pilot.press('enter')
+                    self.assertIs(app.screen, login)
+                    self.assertIn('at least 3', str(login.query_one('#status', Static).render()))
+                    login.query_one('#master', Input).value = 'test master phrase'
+                    login.query_one('#once', Button).focus()
+                    await pilot.press('enter')
+                    modal = app.screen
+                    self.assertEqual(app.focused.id, 'once-email')
+                    await pilot.press('enter')
+                    self.assertEqual(clipboard['value'], '')
+                    modal.query_one(Input).value = ' Alice@EXAMPLE.COM '
+                    await pilot.press('enter')
+                    self.assertEqual(clipboard['value'], 'WZUf-1GTVFDrUsDPGbcT1Oc)')
+                    self.assertEqual(str(modal.query_one('#status', Static).render()), 'Copied')
+                    self.assertFalse(path.exists())
+                    self.assertIsNone(app.session)
+                    key = modal.generation_key
+                    await pilot.press('escape')
+                    self.assertIs(app.screen, login)
+                    self.assertFalse(any(key))
+                    self.assertEqual(clipboard['value'], 'WZUf-1GTVFDrUsDPGbcT1Oc)')
+
+    async def test_once_preserves_existing_database_and_handles_clipboard_error(self):
+        import pyperclip
+        from textual.widgets import Input, Button, Static
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'vault.db'
+            session = vault.VaultSession.open(path, 'different master phrase')
+            session.add('saved@example.com')
+            session.close()
+            original = path.read_bytes()
+            app = vault.VaultApp(path)
+            async with app.run_test(size=(40, 18)) as pilot:
+                app.screen.query_one('#master', Input).value = 'test master phrase'
+                await pilot.click('#once')
+                modal = app.screen
+                modal.query_one(Input).value = 'Alice@example.com'
+                with patch('pyperclip.copy', side_effect=pyperclip.PyperclipException):
+                    await pilot.click('#once-copy')
+                self.assertIn('Clipboard unavailable', str(modal.query_one('#status', Static).render()))
+                copied = []
+                with patch('pyperclip.copy', side_effect=copied.append):
+                    modal.query_one(Input).focus()
+                    await pilot.press('enter')
+                self.assertEqual(copied, ['WZUf-1GTVFDrUsDPGbcT1Oc)'])
+                self.assertEqual(path.read_bytes(), original)
+                self.assertIsNone(app.session)
+                key = modal.generation_key
+            self.assertFalse(any(key))
+
     async def test_search_arrows_move_focus_at_text_boundaries(self):
         import time
         from textual.widgets import Input

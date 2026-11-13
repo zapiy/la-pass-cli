@@ -1,6 +1,7 @@
 import hmac
 import time
 
+import pyperclip
 from rich.text import Text
 from sqlcipher3 import dbapi2 as sqlcipher
 from textual.app import ComposeResult
@@ -8,7 +9,7 @@ from textual.containers import Horizontal, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, Input, Static
 
-from ..crypto import derive_keys, wipe
+from ..crypto import canonical_email, derive_generation_key, derive_keys, generate_password, wipe
 from ..storage import VaultError, VaultSession
 from .accounts import AccountsScreen
 from .widgets import ArrowScreen, FormInput, lap_logo
@@ -47,6 +48,47 @@ class ClearDataModal(ArrowScreen, ModalScreen):
         self.dismiss(False)
 
 
+class OnceModal(ArrowScreen, ModalScreen):
+    def __init__(self, generation_key: bytearray):
+        super().__init__()
+        self.generation_key = generation_key
+
+    def compose(self) -> ComposeResult:
+        with VerticalScroll(id='once-form'):
+            yield Static('GENERATE ONCE', classes='modal-title')
+            yield FormInput(placeholder='alice@example.com', id='once-email')
+            with Horizontal(id='once-actions'):
+                yield Button('Copy', id='once-copy')
+            yield Static('', id='status', markup=False)
+            yield Static('↑↓ Select  Enter Copy  Esc Close', classes='modal-hint')
+
+    def on_mount(self):
+        self.query_one(Input).focus()
+
+    def submit(self):
+        status = self.query_one('#status', Static)
+        try:
+            email = canonical_email(self.query_one(Input).value)
+            pyperclip.copy(generate_password(self.generation_key, email))
+        except ValueError as error:
+            status.update(str(error))
+            return
+        except pyperclip.PyperclipException:
+            status.update('Clipboard unavailable: check your system backend')
+            return
+        status.update('Copied')
+
+    def on_button_pressed(self, event: Button.Pressed):
+        event.stop()
+        self.submit()
+
+    def action_back(self):
+        self.dismiss()
+
+    def on_unmount(self):
+        wipe(self.generation_key)
+
+
 class LoginScreen(ArrowScreen):
     def __init__(self):
         super().__init__()
@@ -62,6 +104,7 @@ class LoginScreen(ArrowScreen):
             yield Checkbox('Show password', id='visible')
             with Horizontal(id='login-actions'):
                 yield Button('Unlock', id='unlock', variant='primary')
+                yield Button('Once', id='once')
                 yield Button(Text('_[]_\n|  |\n|__|'), id='clear-data',
                              tooltip='Clear data', disabled=not self.app.db_path.exists())
         yield Static('↑↓ Select  ←→ Cursor  Enter OK  Esc Exit', id='hint')
@@ -82,6 +125,18 @@ class LoginScreen(ArrowScreen):
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == 'unlock':
             self.submit()
+        elif event.button.id == 'once':
+            field = self.query_one('#master', Input)
+            try:
+                generation_key = derive_generation_key(field.value)
+            except ValueError as error:
+                self.query_one('#status', Static).update(str(error))
+                field.focus()
+                return
+            field.value = ''
+            field.password = True
+            self.query_one('#visible', Checkbox).value = False
+            self.app.push_screen(OnceModal(generation_key))
         elif event.button.id == 'clear-data':
             self.app.push_screen(ClearDataModal(), self.clear_data)
 

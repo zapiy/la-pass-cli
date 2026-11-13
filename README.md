@@ -41,6 +41,8 @@ The application automatically locks after 30 minutes by default, regardless of a
 
 Copied passwords are cleared from the clipboard after 30 seconds if its contents have not changed. Locking and normal shutdown also attempt to clear the application's copied value. Clipboard history managers may retain copies; cleanup cannot be guaranteed after a crash or forced termination.
 
+For generation without saving an account, enter a master password on the login screen and select **Once**. Enter an email in the dialog and press **Copy** (or Enter). This uses algorithm v1 without opening or modifying the database. The entered master password is cleared when the dialog opens; its temporary generation key is wiped when the dialog closes. Esc closes the dialog. Passwords copied through Once have no clipboard cleanup timer and remain in the clipboard after closing the dialog or application. The same master password and email reproduce the same password; the master password is not checked against the vault in this mode.
+
 ## Reproducibility and backups
 
 The same master password and canonical email produce the same 24-character password on any device running algorithm v1. No random salt, device identifier, or database contents affect generation. The SQLCipher database has its own random encryption salt, which is separate from password generation.
