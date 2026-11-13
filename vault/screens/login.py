@@ -111,6 +111,10 @@ class LoginScreen(ArrowScreen):
     def submit(self):
         field = self.query_one('#master', Input)
         status = self.query_one('#status', Static)
+        if len(field.value) < 3:
+            status.update('Master password must contain at least 3 characters')
+            field.focus()
+            return
         try:
             keys = derive_keys(field.value)
             field.value = ''

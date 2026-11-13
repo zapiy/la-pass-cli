@@ -24,7 +24,7 @@ Use a Unicode terminal of at least 80 columns by 24 rows. On macOS, clipboard ac
 
 ## Usage
 
-On first launch, enter and confirm a master password. The application then creates `vault.db` alongside the script. Subsequent launches use the master password to open that file. Failed attempts do not recreate the database. The script directory must be writable.
+On first launch, enter and confirm a master password of at least 3 characters. The application then creates `vault.db` alongside the script. Subsequent launches use the master password to open that file. Failed attempts do not recreate the database. The script directory must be writable.
 
 The master password is masked with asterisks. Select **Show password** and press Enter to toggle visibility. After unlocking, use **+ Add account** to add an email, or select the **Copy** button to the right of an existing email to generate and copy its password.
 

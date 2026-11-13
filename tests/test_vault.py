@@ -36,6 +36,14 @@ class TerminalTests(unittest.TestCase):
 
 
 class CryptoTests(unittest.TestCase):
+    def test_master_password_minimum_length(self):
+        for master in ('', 'a', 'ab', 'яю'):
+            with self.subTest(master=master), self.assertRaises(ValueError):
+                vault.derive_keys(master)
+        for master in ('abc', 'яюё'):
+            keys = vault.derive_keys(master)
+            self.assertTrue(all(len(key) == 32 for key in keys))
+
     def test_canonical_email(self):
         self.assertEqual(vault.canonical_email(' Alice@EXAMPLE.COM '), 'Alice@example.com')
         for value in ('', 'abc', 'a@@b.com', 'a b@c.com', 'a@', '@example.com'):
@@ -142,6 +150,24 @@ class SettingsTests(unittest.TestCase):
 
 
 class UITests(unittest.IsolatedAsyncioTestCase):
+    async def test_short_master_password_is_rejected(self):
+        from textual.widgets import Input, Static
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'vault.db'
+            app = vault.VaultApp(path)
+            async with app.run_test() as pilot:
+                login = app.screen
+                for master in ('', 'a', 'ab'):
+                    login.query_one('#master', Input).value = master
+                    await pilot.press('enter')
+                    self.assertIn('at least 3 characters', str(login.query_one('#status', Static).render()))
+                    self.assertIsNone(login.pending_keys)
+                    self.assertFalse(path.exists())
+                for _ in range(2):
+                    login.query_one('#master', Input).value = 'abc'
+                    await pilot.press('enter')
+                self.assertIsNotNone(app.session)
+
     async def test_lock_interval_selection_cancel_persistence_and_timeout(self):
         import time
         from textual.widgets import Button, Static

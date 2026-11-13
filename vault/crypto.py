@@ -28,8 +28,8 @@ def canonical_email(value: str) -> str:
 
 
 def derive_keys(master: str) -> tuple[bytearray, bytearray]:
-    if not master:
-        raise ValueError('Enter your master password')
+    if len(master) < 3:
+        raise ValueError('Master password must contain at least 3 characters')
     root = bytearray(hashlib.scrypt(master.encode('utf-8'), salt=b'', n=2**17,
                                    r=8, p=1, dklen=32, maxmem=256 * 1024**2))
     try:
