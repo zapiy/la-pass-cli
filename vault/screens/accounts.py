@@ -8,6 +8,7 @@ from sqlcipher3 import dbapi2 as sqlcipher
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
+from textual.timer import Timer
 from textual.widgets import Button, Input, Static
 
 from .widgets import ArrowScreen, FormInput, lap_logo
@@ -23,9 +24,13 @@ def mask_email(email: str) -> str:
 
 
 class AccountsScreen(ArrowScreen):
+    SEARCH_DELAY = 0.4
+    _search_timer: Timer | None = None
+
     def compose(self) -> ComposeResult:
         with Horizontal(id='accounts-header'):
             yield Static(lap_logo(), id='lock-icon', markup=False)
+            yield FormInput(placeholder='Search', id='search')
             with Horizontal(id='accounts-actions'):
                 yield Button('+ Add', id='add', variant='primary')
                 yield Button('', id='lock-timer', tooltip='Auto-lock interval')
@@ -35,7 +40,7 @@ class AccountsScreen(ArrowScreen):
                     yield Static(mask_email(email), markup=False, classes='email')
                     yield Button('Copy', id=f'copy-{index}', name=email)
                     yield Button('◉', id=f'show-{index}', name=email, classes='show-email', tooltip='Show email')
-                    yield Button(Text('_[]_\n|><|\n|__|'), id=f'delete-{index}',
+                    yield Button(Text('_[]_\n|  |\n|__|'), id=f'delete-{index}',
                                  name=email, classes='delete-account', tooltip='Delete account')
         yield Static('', id='status', markup=False)
         yield Static('↑↓ Select  Enter OK  Esc Lock', id='hint')
@@ -48,6 +53,18 @@ class AccountsScreen(ArrowScreen):
         buttons = list(self.query(Button))
         next((b for b in buttons if b.name == email and b.id.startswith('copy-')),
              self.query_one('#add', Button)).focus()
+
+    def on_input_changed(self, event: Input.Changed):
+        if event.input.id == 'search':
+            if self._search_timer is not None:
+                self._search_timer.stop()
+            self._search_timer = self.set_timer(self.SEARCH_DELAY, self.apply_search)
+
+    def apply_search(self):
+        self._search_timer = None
+        query = self.query_one('#search', Input).value.casefold()
+        for row in self.query('.account'):
+            row.display = query in row.query_one(Button).name.casefold()
 
     def update_lock_timer(self):
         minutes = max(0, ceil((self.app.lock_seconds - (time.time() - self.app.unlocked_at)) / 60))

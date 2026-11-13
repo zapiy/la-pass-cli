@@ -62,7 +62,7 @@ class LoginScreen(ArrowScreen):
             yield Checkbox('Show password', id='visible')
             with Horizontal(id='login-actions'):
                 yield Button('Unlock', id='unlock', variant='primary')
-                yield Button(Text('_[]_\n|><|\n|__|'), id='clear-data',
+                yield Button(Text('_[]_\n|  |\n|__|'), id='clear-data',
                              tooltip='Clear data', disabled=not self.app.db_path.exists())
             yield Static('', id='status', markup=False)
         yield Static('↑↓ Select  ←→ Cursor  Enter OK  Esc Exit', id='hint')

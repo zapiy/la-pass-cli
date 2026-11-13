@@ -358,6 +358,38 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                             self.assertLessEqual(button.region.right, width)
                             self.assertLessEqual(button.region.bottom, height)
 
+    async def test_search_filters_full_email_and_clears(self):
+        import time
+        from textual.widgets import Input
+        with tempfile.TemporaryDirectory() as directory:
+            app = vault.VaultApp(Path(directory) / 'vault.db')
+            async with app.run_test(size=(100, 32)) as pilot:
+                app.session = vault.VaultSession.open(app.db_path, 'test master phrase')
+                app.unlocked_at = time.time()
+                for email in ('alice@example.com', 'bob@other.com'):
+                    app.session.add(email)
+                await app.switch_screen(vault.AccountsScreen())
+                await pilot.pause()
+                search = app.screen.query_one('#search', Input)
+                self.assertGreaterEqual(search.region.x, app.screen.query_one('#lock-icon').region.right)
+                self.assertLessEqual(search.region.right, app.screen.query_one('#add').region.x)
+                search.value = 'missing'
+                await pilot.pause(0.15)
+                self.assertTrue(all(row.display for row in app.screen.query('.account')))
+                search.value = 'ALICE'
+                await pilot.pause(0.2)
+                self.assertTrue(all(row.display for row in app.screen.query('.account')))
+                await pilot.pause(app.screen.SEARCH_DELAY)
+                self.assertEqual([row.query_one('Button').name for row in app.screen.query('.account')
+                                  if row.display], ['alice@example.com'])
+                for query, expected in (('ALICE', ['alice@example.com']),
+                                        ('other', ['bob@other.com']), ('missing', []),
+                                        ('', ['alice@example.com', 'bob@other.com'])):
+                    search.value = query
+                    await pilot.pause(app.screen.SEARCH_DELAY + 0.1)
+                    self.assertEqual([row.query_one('Button').name for row in app.screen.query('.account')
+                                      if row.display], expected)
+
     async def test_email_mask_preserves_ends_and_masks_second_of_two(self):
         with tempfile.TemporaryDirectory() as directory:
             app = vault.VaultApp(Path(directory) / 'vault.db')
