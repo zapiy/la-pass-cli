@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 from functools import partial
 from math import ceil
 import time
@@ -24,6 +26,10 @@ def mask_email(email: str) -> str:
 
 
 class AccountsScreen(ArrowScreen):
+    clipboard_digest: bytes | None = None
+    clipboard_timer: Timer | None = None
+
+    COPIED_MESSAGE = 'Copied. Clipboard clears in 30 seconds'
     SEARCH_DELAY = 0.4
     _search_timer: Timer | None = None
 
@@ -53,6 +59,37 @@ class AccountsScreen(ArrowScreen):
         buttons = list(self.query(Button))
         next((b for b in buttons if b.name == email and b.id.startswith('copy-')),
              self.query_one('#add', Button)).focus()
+
+    def copy_password(self, email: str):
+        if not self.app.ensure_unlocked():
+            return
+        password = self.app.session.password(email)
+        pyperclip.copy(password)
+        self.clipboard_digest = hashlib.sha256(password.encode('utf-8')).digest()
+        del password
+        if self.clipboard_timer:
+            self.clipboard_timer.stop()
+        self.clipboard_timer = self.set_timer(30, self.clear_clipboard)
+
+    def clear_clipboard(self):
+        if self.clipboard_timer is not None:
+            self.clipboard_timer.stop()
+            self.clipboard_timer = None
+        if self.clipboard_digest is not None:
+            try:
+                current = pyperclip.paste()
+                if hmac.compare_digest(hashlib.sha256(current.encode('utf-8')).digest(), self.clipboard_digest):
+                    pyperclip.copy('')
+            except pyperclip.PyperclipException:
+                pass
+            finally:
+                self.clipboard_digest = None
+                for status in self.query('#status').results(Static):
+                    if str(status.render()) == self.COPIED_MESSAGE:
+                        status.update('')
+
+    def on_unmount(self):
+        self.clear_clipboard()
 
     def on_input_changed(self, event: Input.Changed):
         if event.input.id == 'search':
@@ -97,8 +134,8 @@ class AccountsScreen(ArrowScreen):
                                  partial(self.delete_account, event.button.name))
         elif event.button.name:
             try:
-                self.app.copy_password(event.button.name)
-                self.query_one('#status', Static).update('Copied. Clipboard clears in 30 seconds')
+                self.copy_password(event.button.name)
+                self.query_one('#status', Static).update(self.COPIED_MESSAGE)
             except pyperclip.PyperclipException:
                 self.query_one('#status', Static).update('Clipboard unavailable: check your system backend')
 

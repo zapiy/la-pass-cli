@@ -12,8 +12,8 @@ Button { min-width: 11; width: 11; margin: 0 1 0 0; }
 #lock-icon { width: 17; height: 4; text-align: left; color: #B2DFDB; }
 #login-form { height: 1fr; align-vertical: middle; }
 #login-title { height: 1; margin-bottom: 1; }
-#visible { margin-top: 2; margin-bottom: 1; max-width: 100%; }
-#status { height: auto; min-height: 2; color: #f0c878; margin-top: 1; }
+#visible { margin-top: 1; margin-bottom: 1; max-width: 100%; }
+#status { height: auto; color: #f0c878; }
 #hint { dock: bottom; height: auto; color: #9aaebd; }
 #accounts-header { height: 4; align-vertical: middle; }
 #accounts-header #lock-icon { width: 17; margin-right: 2; }

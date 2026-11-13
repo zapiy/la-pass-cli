@@ -482,7 +482,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(app.screen.query_one('#master', Input).password)
 
     async def test_timeout_from_add_and_clipboard_ownership(self):
-        from textual.widgets import Input
+        from textual.widgets import Button, Input, Static
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'vault.db'
             session = vault.VaultSession.open(path, 'test master phrase')
@@ -496,14 +496,31 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
                 clipboard = {'value': ''}
                 with patch.object(vault.pyperclip, 'copy', side_effect=lambda v: clipboard.update(value=v)), patch.object(vault.pyperclip, 'paste', side_effect=lambda: clipboard['value']):
-                    app.copy_password('alice@example.com')
+                    app.screen.query_one('#copy-0', Button).press()
+                    await pilot.pause()
+                    status = app.screen.query_one('#status', Static)
+                    accounts = app.screen
+                    self.assertIsNotNone(accounts.clipboard_timer)
+                    self.assertIn('Copied.', str(status.render()))
                     self.assertEqual(len(clipboard['value']), 24)
-                    app.clear_clipboard()
+                    accounts.clear_clipboard()
                     self.assertEqual(clipboard['value'], '')
-                    app.copy_password('alice@example.com')
+                    self.assertEqual(str(status.render()), '')
+                    accounts.copy_password('alice@example.com')
+                    status.update('Another message')
                     clipboard['value'] = 'user replacement'
-                    app.clear_clipboard()
+                    accounts.clear_clipboard()
                     self.assertEqual(clipboard['value'], 'user replacement')
+                    self.assertEqual(str(status.render()), 'Another message')
+                    accounts.copy_password('alice@example.com')
+                    await app.push_screen(vault.AddScreen())
+                    app.lock()
+                    await pilot.pause()
+                    self.assertEqual(clipboard['value'], '')
+                    self.assertIsNone(accounts.clipboard_timer)
+                    app.screen.query_one('#master', Input).value = 'test master phrase'
+                    await pilot.press('enter')
+                    await pilot.pause()
                 await pilot.press('enter')
                 await pilot.pause()
                 self.assertIsInstance(app.screen, vault.AddScreen)
