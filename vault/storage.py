@@ -21,8 +21,8 @@ class VaultSession:
         self.lock_seconds = value if type(value) is int and value in (1800, 3600, 10800) else LOCK_SECONDS
 
     @classmethod
-    def open(cls, path: Path, master: str) -> VaultSession:
-        generation, database = derive_keys(master)
+    def open(cls, path: Path, master: str, pin: str = '') -> VaultSession:
+        generation, database = derive_keys(master, pin)
         return cls.from_keys(path, generation, database)
 
     @classmethod

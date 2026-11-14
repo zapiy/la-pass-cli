@@ -1,11 +1,12 @@
 import hmac
+import secrets
 import time
 
 import pyperclip
 from rich.text import Text
 from sqlcipher3 import dbapi2 as sqlcipher
 from textual.app import ComposeResult
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal, HorizontalScroll, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, Input, Static
 
@@ -93,9 +94,16 @@ class LoginScreen(ArrowScreen):
     def __init__(self):
         super().__init__()
         self.pending_keys = None
+        self.pin = ''
 
     def compose(self) -> ComposeResult:
-        with Horizontal(id='logo-header'):
+        with HorizontalScroll(id='logo-header'):
+            with Horizontal(id='pin-controls'):
+                for digit in secrets.SystemRandom().sample('0123456789', 10):
+                    yield Button(digit, id=f'pin-{digit}', classes='pin-digit')
+                yield Static('·', id='pin-display', markup=False)
+                yield Button('<', id='pin-delete', disabled=True, tooltip='Erase last digit')
+            yield Static('', id='login-header-spacer')
             yield Static(lap_logo(), id='lock-icon', markup=False)
         with VerticalScroll(id='login-form'):
             yield Static('MASTER PASSWORD', id='login-title')
@@ -115,6 +123,9 @@ class LoginScreen(ArrowScreen):
             self.call_after_refresh(self.focused.scroll_visible, animate=False)
 
     def on_mount(self):
+        # Textual's CSS parser rejects line-pad: 0; compact buttons need it.
+        for button in self.query('#pin-controls Button'):
+            button.styles.line_pad = 0
         self.query_one('#master', Input).focus()
         if not self.app.db_path.exists():
             self.query_one('#status', Static).update('First run: set your master password')
@@ -123,17 +134,31 @@ class LoginScreen(ArrowScreen):
         self.query_one('#master', Input).password = not event.value
 
     def on_button_pressed(self, event: Button.Pressed):
-        if event.button.id == 'unlock':
+        if event.button.has_class('pin-digit') or event.button.id == 'pin-delete':
+            event.stop()
+            if event.button.id == 'pin-delete':
+                self.pin = self.pin[:-1]
+            elif len(self.pin) < 4:
+                self.pin += str(event.button.label)
+            display = self.query_one('#pin-display', Static)
+            display.update(self.pin.ljust(4, '·') if self.pin else '·')
+            display.set_class(0 < len(self.pin) < 4, 'incomplete')
+            self.query_one('#pin-delete', Button).disabled = not self.pin
+            incomplete = 0 < len(self.pin) < 4
+            self.query_one('#unlock', Button).disabled = incomplete
+            self.query_one('#once', Button).disabled = incomplete
+        elif event.button.id == 'unlock':
             self.submit()
         elif event.button.id == 'once':
             field = self.query_one('#master', Input)
             try:
-                generation_key = derive_generation_key(field.value)
+                generation_key = derive_generation_key(field.value, self.pin)
             except ValueError as error:
                 self.query_one('#status', Static).update(str(error))
                 field.focus()
                 return
             field.value = ''
+            self.reset_pin()
             field.password = True
             self.query_one('#visible', Checkbox).value = False
             self.app.push_screen(OnceModal(generation_key))
@@ -153,6 +178,7 @@ class LoginScreen(ArrowScreen):
             status.update('Cannot delete vault data. Check file access and try again')
             return
         self.clear_pending()
+        self.reset_pin()
         field = self.query_one('#master', Input)
         field.value = ''
         field.password = True
@@ -165,18 +191,24 @@ class LoginScreen(ArrowScreen):
     def submit(self):
         field = self.query_one('#master', Input)
         status = self.query_one('#status', Static)
+        if 0 < len(self.pin) < 4:
+            status.update('Enter 4 PIN digits or clear the PIN')
+            return
         if len(field.value) < 3:
             status.update('Master password must contain at least 3 characters')
             field.focus()
             return
         try:
-            keys = derive_keys(field.value)
+            has_pin = bool(self.pin)
+            keys = derive_keys(field.value, self.pin)
             field.value = ''
+            self.reset_pin()
             field.password = True
             self.query_one('#visible', Checkbox).value = False
             if not self.app.db_path.exists() and self.pending_keys is None:
                 self.pending_keys = keys
-                status.update('Enter your master password again to confirm')
+                status.update('Enter your master password and PIN again to confirm' if has_pin
+                              else 'Enter your master password again to confirm')
                 field.focus()
                 return
             if self.pending_keys is not None:
@@ -185,7 +217,7 @@ class LoginScreen(ArrowScreen):
                 if not matches:
                     for key in keys:
                         wipe(key)
-                    status.update('Passwords do not match. Start again')
+                    status.update('Passwords or PINs do not match. Start again')
                     field.focus()
                     return
             self.app.session = VaultSession.from_keys(self.app.db_path, *keys)
@@ -193,10 +225,19 @@ class LoginScreen(ArrowScreen):
             self.app.switch_screen(AccountsScreen())
         except (ValueError, VaultError, OSError, sqlcipher.Error):
             field.value = ''
+            self.reset_pin()
             field.password = True
             self.query_one('#visible', Checkbox).value = False
-            status.update('Cannot unlock. Check your master password and file access')
+            status.update('Cannot unlock. Check your master password, PIN and file access')
             field.focus()
+
+    def reset_pin(self):
+        self.pin = ''
+        self.query_one('#pin-display', Static).update('·')
+        self.query_one('#pin-display', Static).remove_class('incomplete')
+        self.query_one('#pin-delete', Button).disabled = True
+        self.query_one('#unlock', Button).disabled = False
+        self.query_one('#once', Button).disabled = False
 
     def clear_pending(self):
         if self.pending_keys:
@@ -205,6 +246,7 @@ class LoginScreen(ArrowScreen):
             self.pending_keys = None
 
     def on_unmount(self):
+        self.pin = ''
         self.clear_pending()
 
     def action_back(self):

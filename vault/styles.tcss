@@ -1,6 +1,5 @@
 $primary: #B2DFDB;
 $accent: #B2DFDB;
-
 Screen { background: #101820; color: #e2e8f0; padding: 2 4; }
 Screen.narrow { padding: 1; }
 Screen.short { padding-top: 0; padding-bottom: 0; }
@@ -8,7 +7,13 @@ Input { width: 48; max-width: 100%; }
 Input:focus, Button:focus, Checkbox:focus { border: heavy #B2DFDB; }
 Button { min-width: 11; width: 11; margin: 0 1 0 0; }
 .title { height: 3; text-style: bold; color: #B2DFDB; }
-#logo-header { dock: top; height: 4; align-horizontal: right; }
+#logo-header { dock: top; height: 4; align-horizontal: left; }
+#pin-controls { width: auto; height: 3; }
+#login-header-spacer { width: 1fr; min-width: 1; height: 1; }
+#pin-controls Button { width: 3; min-width: 3; height: 3; min-height: 3; padding: 0; margin: 0; border: round #42515e; }
+#pin-controls Button:focus { border: heavy #B2DFDB; }
+#pin-display { width: auto; min-width: 3; height: 3; padding: 0 1; margin: 0 1; border: round #B2DFDB; content-align: center middle; }
+#pin-display.incomplete { border: round #E53935; color: #E53935; }
 #lock-icon { width: 17; height: 4; text-align: left; color: #B2DFDB; }
 #login-form { height: 1fr; align-vertical: middle; }
 #login-title { height: 1; margin-bottom: 1; }
@@ -51,7 +56,6 @@ Screen.narrow .account Button { width: 100%; min-width: 0; }
 Screen.short #visible { margin-top: 1; margin-bottom: 0; }
 Screen.short #login-title { margin-bottom: 0; }
 Screen.short #status { margin-top: 0; }
-
 Button.-primary { background: #B2DFDB; color: #ffffff; }
 Button.-primary:hover { background: #C2185B; }
 #login-title { color: #B2DFDB; }
@@ -60,6 +64,7 @@ LoginScreen Input, LoginScreen Checkbox { margin-left: 0; margin-right: 0; paddi
 #unlock:hover { background: #009688; }
 #unlock:focus { border: heavy #29B6F6; }
 #once, #once-copy { background: #FFB300; color: #101820; }
+#once, #once:hover { border: round #FFB300; }
 #once:focus, #once-copy:focus { border: heavy #FFB300; }
 #login-actions { height: 3; }
 Screen.narrow #login-actions { layout: grid; grid-size: 2; grid-columns: 18 1fr; grid-rows: 3 3; height: 6; }

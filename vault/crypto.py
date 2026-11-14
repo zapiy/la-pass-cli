@@ -27,23 +27,28 @@ def canonical_email(value: str) -> str:
     return local + '@' + domain.lower()
 
 
-def _derive_root(master: str) -> bytearray:
+def _derive_root(master: str, pin: str = '') -> bytearray:
     if len(master) < 3:
         raise ValueError('Master password must contain at least 3 characters')
-    return bytearray(hashlib.scrypt(master.encode('utf-8'), salt=b'', n=2**17,
+    if pin and (len(pin) != 4 or any(c not in string.digits for c in pin)):
+        raise ValueError('Enter 4 PIN digits or clear the PIN')
+    material = master.encode('utf-8')
+    if pin:
+        material = len(material).to_bytes(4, 'big') + material + pin.encode('ascii')
+    return bytearray(hashlib.scrypt(material, salt=b'', n=2**17,
                                     r=8, p=1, dklen=32, maxmem=256 * 1024**2))
 
 
-def derive_generation_key(master: str) -> bytearray:
-    root = _derive_root(master)
+def derive_generation_key(master: str, pin: str = '') -> bytearray:
+    root = _derive_root(master, pin)
     try:
         return bytearray(hmac.digest(root, b'vault:v1:generation', 'sha256'))
     finally:
         wipe(root)
 
 
-def derive_keys(master: str) -> tuple[bytearray, bytearray]:
-    root = _derive_root(master)
+def derive_keys(master: str, pin: str = '') -> tuple[bytearray, bytearray]:
+    root = _derive_root(master, pin)
     try:
         return (bytearray(hmac.digest(root, b'vault:v1:generation', 'sha256')),
                 bytearray(hmac.digest(root, b'vault:v1:database', 'sha256')))

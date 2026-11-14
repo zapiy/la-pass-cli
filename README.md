@@ -1,6 +1,6 @@
 # Deterministic Password Vault
 
-A Python terminal application that generates reproducible passwords from one master password and an email address. Only email addresses are stored in an encrypted SQLCipher database next to `vault.py`. Master passwords and generated passwords are never saved to the database.
+A Python terminal application that generates reproducible passwords from a master password, an optional four-digit PIN, and an email address. Only email addresses are stored in an encrypted SQLCipher database next to `vault.py`. Master passwords, PINs, and generated passwords are never saved to the database.
 
 ## Setup and launch
 
@@ -24,7 +24,11 @@ Use a Unicode terminal of at least 80 columns by 24 rows. On macOS, clipboard ac
 
 ## Usage
 
-On first launch, enter and confirm a master password of at least 3 characters. The application then creates `vault.db` alongside the script. Subsequent launches use the master password to open that file. Failed attempts do not recreate the database. The script directory must be writable.
+On first launch, enter and confirm a master password of at least 3 characters, together with the optional PIN if used. The application then creates `vault.db` alongside the script. Subsequent launches require the same master password and PIN (or an empty PIN if none was used) to open that file. Failed attempts do not recreate the database. The script directory must be writable.
+
+The PIN controls appear on the left of the login header; the logo stays on the right. Select digit buttons with the arrow keys and press Enter, or click them. Digits 0–9 are shuffled when the login screen is created and keep their positions while entering the PIN. Direct typing and pasting into the PIN display are unavailable. Leading zeros are preserved. The empty display is compact; after entering a digit it shows four positions, with a red border for an incomplete PIN. **<** removes the last digit and is disabled when empty. **Unlock** and **Once** are disabled while 1–3 digits are entered; submitting the master-password field also rejects an incomplete PIN. On narrow terminals, the header scrolls horizontally.
+
+For first-run confirmation, both the master password and PIN are cleared and must be entered again. A different PIN or master password cancels confirmation. The PIN is also cleared after an unlock attempt, when opening Once, and when deleting vault data.
 
 The master password is masked with asterisks. Select **Show password** and press Enter to toggle visibility. After unlocking, use **+ Add account** to add an email, or select the **Copy** button to the right of an existing email to generate and copy its password.
 
@@ -41,27 +45,29 @@ The application automatically locks after 30 minutes by default, regardless of a
 
 Copied passwords are cleared from the clipboard after 30 seconds if its contents have not changed. Locking and normal shutdown also attempt to clear the application's copied value. Clipboard history managers may retain copies; cleanup cannot be guaranteed after a crash or forced termination.
 
-For generation without saving an account, enter a master password on the login screen and select **Once**. Enter an email in the dialog and press **Copy** (or Enter). This uses algorithm v1 without opening or modifying the database. The entered master password is cleared when the dialog opens; its temporary generation key is wiped when the dialog closes. Esc closes the dialog. Passwords copied through Once have no clipboard cleanup timer and remain in the clipboard after closing the dialog or application. The same master password and email reproduce the same password; the master password is not checked against the vault in this mode.
+For generation without saving an account, enter a master password and optionally a complete PIN on the login screen, then select **Once**. Enter an email in the dialog and press **Copy** (or Enter). This uses algorithm v1 without opening or modifying the database. The entered master password and PIN are cleared when the dialog opens; its temporary generation key is wiped when the dialog closes. Esc closes the dialog. Passwords copied through Once have no clipboard cleanup timer and remain in the clipboard after closing the dialog or application. The same master password, PIN (including an empty PIN), and email reproduce the same password; these credentials are not checked against the vault in this mode.
 
 ## Reproducibility and backups
 
-The same master password and canonical email produce the same 24-character password on any device running algorithm v1. No random salt, device identifier, or database contents affect generation. The SQLCipher database has its own random encryption salt, which is separate from password generation.
+The same master password, PIN (including an empty PIN), and canonical email produce the same 24-character password on any device running algorithm v1. No random salt, device identifier, or database contents affect generation. The SQLCipher database has its own random encryption salt, which is separate from password generation.
 
-To move the account list, close the application and copy `vault.db`. To reproduce an individual password, only the same algorithm, master password, and email are needed. Keep a backup of the script or algorithm specification.
+To move the account list, close the application and copy `vault.db`. To reproduce an individual password, only the same algorithm, master password, PIN if used, and email are needed. Keep a backup of the script or algorithm specification.
 
-Changing the master password, the case of the email's local part, or the algorithm changes the generated password. Passwords on websites are not changed automatically. There is no master-password recovery or per-site password generation: the same email uses the same generated password everywhere.
+Adding, removing, or changing the PIN, changing the master password, the case of the email's local part, or the algorithm changes the generated password. Passwords on websites are not changed automatically. There is no master-password or PIN recovery or per-site password generation: the same email uses the same generated password everywhere.
 
-## Algorithm v1 — keep unchanged
+Existing databases created without a PIN must still be opened with an empty PIN. Entering a PIN does not migrate or re-encrypt an existing database. Changing an existing vault's master password or PIN is not supported. Generated passwords also change when the PIN changes; website passwords are not updated automatically.
 
-1. Encode the exact master-password string as UTF-8, without trimming or Unicode normalization.
-2. Derive `root = scrypt(master, salt=b'', n=131072, r=8, p=1, dklen=32, maxmem=268435456)`.
+## Algorithm v1 — optional PIN input
+
+1. Encode the exact master-password string as UTF-8, without trimming or Unicode normalization, to obtain `master_bytes`. Validate the PIN: either empty or exactly four ASCII digits. With an empty PIN, `material = master_bytes`, preserving existing v1 results exactly. Otherwise, `material = len(master_bytes).to_bytes(4, 'big') + master_bytes + pin.encode('ascii')`. The length is the UTF-8 byte count, not the character count. This prefix is an encoding boundary, not an additional salt.
+2. Derive `root = scrypt(material, salt=b'', n=131072, r=8, p=1, dklen=32, maxmem=268435456)`.
 3. Derive the generation key with HMAC-SHA256(root, `b'vault:v1:generation'`) and the database key with HMAC-SHA256(root, `b'vault:v1:database'`). Wipe the temporary mutable root buffer.
 4. Canonicalize the email by trimming surrounding whitespace and lowercasing its domain; preserve the local part's case. Common ASCII addresses are supported; quoted local parts and internationalized addresses are not.
 5. Generate blocks using HMAC-SHA256(generation key, `b'vault:v1:password\0' + email_utf8 + b'\0' + counter_uint64_big_endian`), starting the counter at zero.
 6. Use the alphabet `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+`. Reject bytes greater than or equal to `256 - 256 % len(alphabet)`; map the remaining bytes to symbols using modulo. Collect a 24-character candidate and discard the rest of its final block. If the candidate lacks uppercase letters, lowercase letters, digits, or symbols, generate the next candidate with the continuing counter.
 7. Pass the database key to SQLCipher as a hex-text passphrase. SQLCipher applies its own random salt and key derivation, independently of generated passwords.
 
-Test vector — do not use this master password for real accounts:
+Test vector (empty PIN) — do not use this master password for real accounts:
 
 ```text
 Master:   test master phrase
@@ -71,9 +77,9 @@ Password: WZUf-1GTVFDrUsDPGbcT1Oc)
 
 ## Memory and security limits
 
-The original master password is removed from application state after unlocking. The session retains a derived generation key and an open SQLCipher connection. The Python database-key buffer is wiped after opening; SQLCipher retains the key material it needs to operate. A stolen generation key can generate all account passwords without the original master password.
+The original master password and PIN are removed from login state after unlocking. The session retains a derived generation key and an open SQLCipher connection. The Python database-key buffer is wiped after opening; SQLCipher retains the key material it needs to operate. A stolen generation key can generate all account passwords without the original master password.
 
-Python, OpenSSL, the terminal, and clipboard tools may retain temporary copies; physical erasure cannot be guaranteed. Generated passwords briefly exist in memory when copied. Unsalted generation allows attackers to reuse master-password guessing work across users with identical master passwords. Use a long, unique master passphrase.
+Python, OpenSSL, the terminal, and clipboard tools may retain temporary copies; physical erasure cannot be guaranteed. Generated passwords briefly exist in memory when copied. Unsalted generation allows attackers to reuse master-password guessing work across users with identical master passwords and PINs (including an empty PIN). Use a long, unique master passphrase.
 
 This application has not undergone an independent security audit.
 
@@ -84,7 +90,7 @@ This application has not undergone an independent security audit.
 .venv/bin/python -m pip check
 ```
 
-Tests use temporary encrypted databases and synthetic credentials. Keyboard flows run through Textual's headless test pilot. Clipboard ownership and cleanup are tested with an in-memory backend without overwriting the user's system clipboard.
+Tests cover the PIN byte encoding, empty-PIN compatibility, key separation for different PINs, agreement between Once and vault generation keys, PIN controls, and first-run confirmation. Tests use temporary encrypted databases and synthetic credentials. Keyboard flows run through Textual's headless test pilot. Clipboard ownership and cleanup are tested with an in-memory backend without overwriting the user's system clipboard.
 
 At startup, the CLI requests at least 80 columns and 24 rows, preserving dimensions already above the minimum. Terminals that ignore window resize requests retain their current size; the interface remains responsive. Redirected output sends no resize sequence.
 
@@ -96,7 +102,7 @@ vault/crypto.py   Password derivation, generation, and email validation
 vault/storage.py  Encrypted SQLCipher storage and session
 vault/screens/login.py    Login screen and secret input
 vault/screens/accounts.py Account list and add account screen
-vault/screens/common.py   Shared input and keyboard navigation
+vault/screens/widgets.py  Shared input, logo, and keyboard navigation
 vault/app.py      Application lifecycle, locking, and clipboard
 vault/styles.tcss Responsive terminal layout and styles
 vault/__main__.py Module launcher (python -m vault)

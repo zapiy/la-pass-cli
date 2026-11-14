@@ -36,6 +36,28 @@ class TerminalTests(unittest.TestCase):
 
 
 class CryptoTests(unittest.TestCase):
+    def test_pin_encoding_and_empty_pin_compatibility(self):
+        from vault.crypto import _derive_root
+        with patch('vault.crypto.hashlib.scrypt', return_value=bytes(32)) as scrypt:
+            _derive_root('пароль', '0001')
+            master = 'пароль'.encode('utf-8')
+            self.assertEqual(scrypt.call_args.args[0],
+                             len(master).to_bytes(4, 'big') + master + b'0001')
+            _derive_root('пароль')
+            self.assertEqual(scrypt.call_args.args[0], master)
+            for pin in ('1', '123', '12345', 'abcd', '１２３４'):
+                with self.subTest(pin=pin), self.assertRaises(ValueError):
+                    _derive_root('пароль', pin)
+
+    def test_pin_changes_both_keys_and_once_matches(self):
+        from vault.crypto import derive_generation_key
+        original = vault.derive_keys('test master phrase')
+        with_pin = vault.derive_keys('test master phrase', '0001')
+        different = vault.derive_keys('test master phrase', '0002')
+        self.assertTrue(all(a != b for a, b in zip(original, with_pin)))
+        self.assertTrue(all(a != b for a, b in zip(different, with_pin)))
+        self.assertEqual(with_pin[0], derive_generation_key('test master phrase', '0001'))
+
     def test_emails_sort_by_domain_then_name_without_case(self):
         with tempfile.TemporaryDirectory() as directory:
             session = vault.VaultSession.open(Path(directory) / 'vault.db', 'test master phrase')
@@ -184,6 +206,81 @@ class SettingsTests(unittest.TestCase):
 
 
 class UITests(unittest.IsolatedAsyncioTestCase):
+    async def test_pin_creation_confirmation_and_unlock(self):
+        from textual.widgets import Button, Input, Static
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'vault.db'
+            app = vault.VaultApp(path)
+            async with app.run_test() as pilot:
+                login = app.screen
+                for attempt in range(2):
+                    for digit in '0001':
+                        login.query_one(f'#pin-{digit}', Button).press()
+                        await pilot.pause()
+                    login.query_one('#master', Input).value = 'test master phrase'
+                    login.submit()
+                    await pilot.pause()
+                    self.assertEqual(login.pin, '')
+                    if attempt == 0:
+                        self.assertFalse(path.exists())
+                        self.assertIn('PIN again', str(login.query_one('#status', Static).render()))
+                self.assertIsNotNone(app.session)
+            with self.assertRaises(vault.VaultError):
+                vault.VaultSession.open(path, 'test master phrase')
+            session = vault.VaultSession.open(path, 'test master phrase', '0001')
+            session.close()
+
+    async def test_login_pin_buttons_only_update_display(self):
+        from textual.widgets import Button, Input, Static
+        with tempfile.TemporaryDirectory() as directory:
+            app = vault.VaultApp(Path(directory) / 'vault.db')
+            async with app.run_test() as pilot:
+                screen = app.screen
+                buttons = list(screen.query('.pin-digit'))
+                self.assertEqual(len(buttons), 10)
+                self.assertEqual({str(b.label) for b in buttons}, set('0123456789'))
+                display = screen.query_one('#pin-display', Static)
+                self.assertTrue(screen.query_one('#pin-delete', Button).disabled)
+                for digit in '01234':
+                    screen.query_one(f'#pin-{digit}', Button).press()
+                    await pilot.pause()
+                self.assertEqual(str(display.render()), '0123')
+                self.assertFalse(display.has_class('incomplete'))
+                screen.query_one('#pin-delete', Button).focus()
+                await pilot.press('enter', '9')
+                self.assertEqual(str(display.render()), '012·')
+                self.assertTrue(display.has_class('incomplete'))
+                self.assertTrue(screen.query_one('#unlock', Button).disabled)
+                self.assertTrue(screen.query_one('#once', Button).disabled)
+                screen.submit()
+                self.assertIn('4 PIN digits', str(screen.query_one('#status', Static).render()))
+                self.assertEqual(screen.query_one('#master', Input).value, '')
+                for _ in range(3):
+                    screen.query_one('#pin-delete', Button).press()
+                    await pilot.pause()
+                self.assertEqual(str(display.render()), '·')
+                self.assertFalse(display.has_class('incomplete'))
+                self.assertTrue(screen.query_one('#pin-delete', Button).disabled)
+                self.assertIsNone(app.session)
+
+    async def test_pin_focus_keeps_button_geometry(self):
+        from textual.widgets import Button
+        with tempfile.TemporaryDirectory() as directory:
+            app = vault.VaultApp(Path(directory) / 'vault.db')
+            async with app.run_test() as pilot:
+                for button in app.screen.query('#pin-controls Button'):
+                    if button.disabled:
+                        button.disabled = False
+                    app.screen.query_one('#master').focus()
+                    await pilot.pause()
+                    region, content = button.region, button.content_region
+                    self.assertEqual(button.render_line(0).text, str(button.label))
+                    button.focus()
+                    await pilot.pause()
+                    self.assertEqual(button.region, region)
+                    self.assertEqual(button.content_region, content)
+                    self.assertEqual(button.render_line(0).text, str(button.label))
+
     async def test_once_copies_existing_algorithm_without_database_or_cleanup(self):
         from textual.widgets import Input, Button, Static
         with tempfile.TemporaryDirectory() as directory:
@@ -196,7 +293,11 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual([b.id for b in login.query('#login-actions Button')],
                                      ['unlock', 'once', 'clear-data'])
                     self.assertEqual(login.query_one('#once', Button).styles.background.hex, '#FFB300')
+                    once = login.query_one('#once', Button)
+                    content = once.content_region
                     login.query_one('#once', Button).focus()
+                    await pilot.pause()
+                    self.assertEqual(once.content_region, content)
                     await pilot.press('enter')
                     self.assertIs(app.screen, login)
                     self.assertIn('at least 3', str(login.query_one('#status', Static).render()))
